@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 10 · Real-time OLAP · serving the results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,700&family=Work+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LESSON 10 — "CLOSING ARC" DESIGN SYSTEM
+   Dark ground, warm gold + signal red accents, Fraunces display,
+   Work Sans body, Space Mono code. Built from pieces of L1/L4/L9.
+   ============================================================ */
+:root{
+  --bg:#0c1014; --bg-deep:#080b0e; --panel:#151a20; --panel2:#1b2128;
+  --text:#f5f2eb; --soft:#c9c4ba; --muted:#9a968b;
+  --gold:#d4a574; --gold-soft:rgba(212,165,116,0.10); --gold-dim:rgba(212,165,116,0.22);
+  --red:#d23a26; --red-soft:rgba(210,58,38,0.10); --red-dim:rgba(210,58,38,0.22);
+  --grid:rgba(212,165,116,0.045);
+  --code-bg:#11161b;
+  --display:'Fraunces',serif; --sans:'Work Sans',sans-serif; --mono:'Space Mono',ui-monospace,monospace;
+  --dur:0.7s; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+.slide{
+  width:100vw;height:100vh;height:100dvh;overflow:hidden;position:relative;scroll-snap-align:start;
+  display:flex;flex-direction:column;padding:clamp(1.3rem,3.5vw,3.3rem) clamp(1.4rem,5vw,4.5rem);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;min-height:0;overflow:hidden}
+.slide.deep{background-color:var(--bg-deep)}
+
+.crumbs{display:flex;flex-wrap:wrap;font-family:var(--mono);font-size:clamp(0.55rem,0.92vw,0.7rem);color:var(--muted);letter-spacing:0.03em}
+.crumb{padding-right:0.8em;margin-right:0.8em;border-right:1px solid var(--gold-dim)}
+.crumb:last-child{border-right:0;margin-right:0;padding-right:0}
+.crumb.on{color:var(--text);font-weight:700;position:relative}
+.crumb.on::after{content:'';position:absolute;left:0;right:0.8em;bottom:-0.45em;height:2px;background:var(--gold)}
+
+.kicker{font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.74rem);letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:clamp(0.58rem,0.95vw,0.72rem);letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)}
+.section-marker{display:inline-flex;align-items:center;gap:0.4rem;font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);
+  font-weight:700;text-transform:uppercase;letter-spacing:0.12em;padding-bottom:0.35rem;border-bottom:2px solid var(--gold);color:var(--gold);align-self:flex-start}
+.section-marker.hot{border-color:var(--red);color:var(--red)}
+h1{font-family:var(--display);font-weight:900;line-height:0.98;letter-spacing:-0.025em;font-size:clamp(2.5rem,7.5vw,5.6rem);color:var(--text)}
+h2{font-family:var(--display);font-weight:700;line-height:1.05;letter-spacing:-0.015em;font-size:clamp(1.55rem,4.2vw,2.9rem);color:var(--text)}
+h2 em,h1 em{font-style:italic;font-weight:700;color:var(--gold)}
+h2 em.hot,h1 em.hot{color:var(--red)}
+.sub{font-family:var(--sans);font-weight:400;font-size:clamp(0.84rem,1.5vw,1.08rem);color:var(--soft);max-width:640px;line-height:1.6}
+.lede{font-family:var(--sans);font-weight:500;font-size:clamp(0.95rem,1.8vw,1.3rem);color:var(--text);line-height:1.4}
+.label{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted)}
+
+.term{font-family:var(--mono);font-size:0.84em;color:var(--gold);white-space:nowrap;padding:0 0.1em;border-bottom:2px solid var(--gold)}
+.term.hot{color:var(--red);border-color:var(--red)}
+.hl{background:var(--gold-soft);color:var(--gold);padding:0.04em 0.32em;border-radius:2px;font-weight:600}
+.ink-mono{font-family:var(--mono);font-size:0.88em;background:rgba(245,242,235,0.08);padding:0.05em 0.35em;border-radius:3px;color:#e7e3d8}
+
+.bullets{list-style:none;display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.5rem)}
+.bullets li{font-family:var(--sans);font-size:clamp(0.74rem,1.25vw,0.94rem);color:var(--text);line-height:1.45;padding-left:1.35em;text-indent:-1.35em}
+.bullets li::before{content:'\2014';color:var(--gold);font-weight:700;margin-right:0.55em}
+.bullets.hot li::before{color:var(--red)}
+.bullets li strong{font-weight:600}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);flex:1;min-height:0}
+@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.55rem);min-height:0}
+.col-label{font-family:var(--mono);font-size:clamp(0.55rem,0.85vw,0.68rem);font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
+
+.big-q{font-family:var(--display);font-weight:700;font-size:clamp(1.6rem,4.4vw,3.2rem);line-height:1.12;letter-spacing:-0.02em;color:var(--text);max-width:22ch}
+
+.callout{display:flex;gap:clamp(0.4rem,0.9vw,0.65rem);padding:clamp(0.4rem,0.9vh,0.7rem) clamp(0.6rem,1.2vw,1rem);
+  border-radius:5px;border-left:3px solid;flex-shrink:0;background:var(--panel)}
+.callout .ico{flex-shrink:0;width:clamp(0.95rem,1.4vw,1.15rem);height:clamp(0.95rem,1.4vw,1.15rem);margin-top:0.05em}
+.callout .ctxt{font-family:var(--sans);font-size:clamp(0.66rem,1.1vw,0.85rem);line-height:1.5;color:var(--soft)}
+.callout .ctxt strong{color:var(--text)}
+.callout.note{border-color:var(--gold-dim)}
+.callout.danger{background:var(--red-soft);border-color:var(--red)}
+.callout.proof{background:var(--gold-soft);border-color:var(--gold)}
+
+.prompt{background:var(--code-bg);border:1px solid var(--panel2);border-left:3px solid var(--gold);border-radius:5px;padding:clamp(0.42rem,0.95vh,0.68rem) clamp(0.7rem,1.4vw,1.05rem)}
+.prompt .plabel{display:block;font-family:var(--mono);font-size:clamp(0.48rem,0.75vw,0.6rem);font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
+.prompt .pcmd{display:block;font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.78rem);color:#c4ccd4;line-height:1.7}
+.prompt .pcmd::before{content:'\276F  ';color:var(--gold);font-weight:700}
+
+.code-block{background:var(--code-bg);border:1px solid var(--panel2);border-radius:6px;overflow:hidden;min-height:0}
+.code-header{display:flex;align-items:center;gap:5px;padding:clamp(0.28rem,0.5vh,0.4rem) clamp(0.5rem,1vw,0.8rem);
+  background:rgba(212,165,116,0.05);border-bottom:1px solid var(--panel2)}
+.code-dot{width:7px;height:7px;border-radius:50%;background:var(--panel2)}
+.code-label{margin-left:auto;font-family:var(--mono);font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.code-copy{background:var(--panel2);border:1px solid var(--gold-dim);color:var(--text);font-family:var(--mono);font-size:clamp(0.45rem,0.7vw,0.58rem);padding:0.18em 0.65em;border-radius:4px;cursor:pointer;transition:background .15s,color .15s}
+.code-copy:hover{background:var(--gold-dim);color:var(--gold)}
+.code-copy.copied{color:var(--gold)}
+.code-body{padding:clamp(0.5rem,1vh,0.85rem) clamp(0.7rem,1.3vw,1.1rem);font-family:var(--mono);
+  font-size:clamp(0.55rem,0.85vw,0.72rem);line-height:1.62;color:#c4ccd4;white-space:pre;overflow:hidden;text-align:left}
+.k{color:#7fb4e8}.s{color:#d8b478}.fn{color:#e7eaee}.v{color:#9fb6c9}
+.g{color:#d8b478}.n{color:#7fd6a4}.r{color:var(--red);font-weight:700}.cm{color:#5b6672;font-style:italic}
+.gy{color:var(--gold)}
+
+.arch{font-family:var(--mono);font-size:clamp(0.5rem,0.82vw,0.66rem);color:var(--soft);line-height:1.5;white-space:pre;
+  background:var(--panel);border:1px solid var(--panel2);border-radius:6px;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(0.9rem,1.6vw,1.3rem);overflow:hidden}
+
+.dtable{width:100%;border-collapse:collapse}
+.dtable th,.dtable td{font-family:var(--sans);font-size:clamp(0.62rem,1.05vw,0.84rem);
+  padding:clamp(0.22rem,0.5vh,0.42rem) clamp(0.4rem,0.9vw,0.75rem);text-align:left;border-bottom:1px solid var(--panel2)}
+.dtable th{font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.dtable td.num,.dtable th.num{font-family:var(--mono);text-align:right}
+.dtable tr:last-child td{border-bottom:0}
+.dtable .hot{color:var(--red);font-weight:600}
+.dtable .cool{color:var(--gold);font-weight:600}
+
+.stat{font-family:var(--mono);font-weight:700;font-size:clamp(1.5rem,3.6vw,2.7rem);line-height:1;color:var(--text)}
+.stat.cool{color:var(--gold)}.stat.red{color:var(--red)}
+.stat-label{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+
+.flow{display:flex;align-items:center;gap:clamp(0.5rem,1vw,0.8rem);flex-wrap:wrap;margin-top:clamp(0.6rem,1.5vh,1rem)}
+.flow .box{font-family:var(--mono);font-size:clamp(0.58rem,0.95vw,0.72rem);font-weight:700;padding:clamp(0.45rem,0.9vh,0.7rem) clamp(0.7rem,1.2vw,1rem);
+  border-radius:5px;background:var(--panel2);border:1px solid var(--gold-dim);color:var(--gold)}
+.flow .arrow{font-family:var(--mono);color:var(--muted);font-size:clamp(0.7rem,1.2vw,0.9rem)}
+
+.badges{display:flex;gap:clamp(0.5rem,1vw,0.8rem);margin-top:clamp(1.2rem,2.5vh,1.8rem)}
+.badge{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);letter-spacing:0.08em;text-transform:uppercase;
+  padding:clamp(0.35rem,0.7vh,0.5rem) clamp(0.6rem,1.2vw,0.9rem);border-radius:3px;border:1px solid var(--gold-dim);color:var(--gold)}
+
+.progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0%;z-index:100;transition:width .2s var(--ease)}
+.kbd-hint{position:fixed;bottom:clamp(0.6rem,1.5vh,1rem);right:clamp(0.8rem,2vw,1.5rem);font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.62rem);color:var(--muted);z-index:100}
+
+/* animations */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.visible .reveal{opacity:1;transform:translateY(0)}
+.reveal:nth-child(1){transition-delay:.05s}
+.reveal:nth-child(2){transition-delay:.12s}
+.reveal:nth-child(3){transition-delay:.19s}
+.reveal:nth-child(4){transition-delay:.26s}
+.reveal:nth-child(5){transition-delay:.33s}
+.reveal:nth-child(6){transition-delay:.40s}
+
+/* ── cover animation ──────────────────────────────────────────────
+   A MergeTree part, drawn honestly: each vertical stack is one column
+   file, each cell one 8192-row granule. Dots drip in at the top (the
+   Kafka engine writing parts), and a scan sweeps down — but only a
+   contiguous band lights, because that is what the ORDER BY buys you.
+   Ingestion on one axis, selective reads on the other: the lesson.  */
+.cover-viz{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  display:flex;align-items:center;justify-content:flex-end;
+  padding-right:clamp(0.8rem,5vw,4.5rem);
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 48%,#000 90%,transparent 100%);
+          mask-image:linear-gradient(90deg,transparent 0,#000 48%,#000 90%,transparent 100%)}
+.cv-grid{position:relative;display:flex;gap:clamp(5px,0.9vw,12px)}
+.cv-col{display:flex;flex-direction:column;gap:clamp(3px,0.45vh,5px)}
+
+/* the feed: one dot per column file, dripping in on a faster cycle */
+.cv-feed{width:100%;height:clamp(5px,0.7vh,7px);border-radius:50%;background:var(--gold);
+  opacity:0;animation:cvFeed 2.6s linear infinite;animation-delay:var(--fd)}
+@keyframes cvFeed{0%{opacity:0;transform:translateY(-9px)}
+  18%{opacity:.85;transform:translateY(0)}55%{opacity:.18}100%{opacity:.10}}
+
+/* every granule dims by default and brightens as the scan reaches its row */
+.cv-cell{width:clamp(14px,2.1vw,28px);height:clamp(6px,0.8vh,10px);border-radius:2px;
+  background:var(--gold);opacity:.07;
+  animation:cvPass 9s linear infinite;animation-delay:var(--rd)}
+@keyframes cvPass{0%{opacity:.07}3%{opacity:.20}11%{opacity:.07}100%{opacity:.07}}
+
+/* the selected band — the granules the primary index did not skip */
+.cv-cell.hit{animation:cvHit 9s linear infinite;animation-delay:var(--rd)}
+@keyframes cvHit{0%{opacity:.07;box-shadow:none}
+  3%{opacity:1;box-shadow:0 0 12px rgba(212,165,116,.75)}
+  30%{opacity:.92;box-shadow:0 0 7px rgba(212,165,116,.45)}
+  55%{opacity:.10;box-shadow:none}100%{opacity:.07;box-shadow:none}}
+
+.cv-scan{position:absolute;left:-6%;width:112%;height:2px;top:0;
+  background:linear-gradient(90deg,transparent,var(--red),transparent);
+  opacity:.5;animation:cvScan 9s linear infinite}
+@keyframes cvScan{0%{top:0;opacity:0}4%{opacity:.55}92%{opacity:.5}100%{top:100%;opacity:0}}
+
+@media (prefers-reduced-motion:reduce){
+  .cv-cell,.cv-cell.hit,.cv-feed,.cv-scan{animation:none}
+  .cv-cell{opacity:.09}.cv-cell.hit{opacity:.85}.cv-feed{opacity:.5}.cv-scan{top:46%;opacity:.4}}
+@media (max-height:600px){.cover-viz{display:none}}
+
+/* prediction spoilers — blurred until click or R (convention from L5 onward) */
+.spoiler{position:relative;cursor:pointer}
+.spoiler>*{filter:blur(9px);transition:filter .5s var(--ease)}
+.spoiler::after{content:'predict first \00b7 click or press R';position:absolute;inset:0;z-index:2;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-size:clamp(0.6rem,1vw,0.78rem);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)}
+.spoiler.revealed>*{filter:none}
+.spoiler.revealed::after{display:none}
+
+.geo{position:absolute;pointer-events:none;z-index:0}
+.geo-circle{top:8%;right:6%;width:min(30vw,280px);height:min(30vw,280px);border:2px solid rgba(245,242,235,0.10);border-radius:50%}
+.geo-dot{bottom:10%;left:5%;width:12px;height:12px;background:var(--red);border-radius:50%;opacity:0.7}
+.geo-line{bottom:18%;left:8%;width:clamp(60px,12vw,140px);height:1px;background:rgba(245,242,235,0.10)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}html{scroll-behavior:auto}}
+@media (max-height:600px){.geo-circle,.kbd-hint{display:none}.sub{font-size:clamp(0.75rem,1.4vw,1rem)}h1{font-size:clamp(1.8rem,6vw,3rem)}h2{font-size:clamp(1.1rem,3vw,1.8rem)}}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar"></div>
+<span class="kbd-hint">&uarr; &darr; navigate</span>
+
+<!-- ─── 01 · TITLE ─────────────────────────────────────── -->
+<section class="slide deep" id="s01" data-speaker="Open cold on the title. This is the closing lesson: results now have to be served, not just computed correctly.">
+  <div class="cover-viz" aria-hidden="true">
+    <div class="cv-grid">
+      <div class="cv-scan"></div>
+      <div class="cv-col" title="event_time">
+        <div class="cv-feed" style="--fd:0.00s"></div>
+        <div class="cv-cell" style="--rd:0.000s"></div>
+        <div class="cv-cell" style="--rd:0.562s"></div>
+        <div class="cv-cell" style="--rd:1.125s"></div>
+        <div class="cv-cell" style="--rd:1.688s"></div>
+        <div class="cv-cell" style="--rd:2.250s"></div>
+        <div class="cv-cell" style="--rd:2.812s"></div>
+        <div class="cv-cell" style="--rd:3.375s"></div>
+        <div class="cv-cell hit" style="--rd:3.938s"></div>
+        <div class="cv-cell hit" style="--rd:4.500s"></div>
+        <div class="cv-cell" style="--rd:5.062s"></div>
+        <div class="cv-cell" style="--rd:5.625s"></div>
+        <div class="cv-cell" style="--rd:6.188s"></div>
+        <div class="cv-cell" style="--rd:6.750s"></div>
+        <div class="cv-cell" style="--rd:7.312s"></div>
+        <div class="cv-cell" style="--rd:7.875s"></div>
+        <div class="cv-cell" style="--rd:8.438s"></div>
+      </div>
+      <div class="cv-col" title="user_id">
+        <div class="cv-feed" style="--fd:0.22s"></div>
+        <div class="cv-cell" style="--rd:0.000s"></div>
+        <div class="cv-cell" style="--rd:0.562s"></div>
+        <div class="cv-cell" style="--rd:1.125s"></div>
+        <div class="cv-cell" style="--rd:1.688s"></div>
+        <div class="cv-cell" style="--rd:2.250s"></div>
+        <div class="cv-cell" style="--rd:2.812s"></div>
+        <div class="cv-cell" style="--rd:3.375s"></div>
+        <div class="cv-cell hit" style="--rd:3.938s"></div>
+        <div class="cv-cell hit" style="--rd:4.500s"></div>
+        <div class="cv-cell" style="--rd:5.062s"></div>
+        <div class="cv-cell" style="--rd:5.625s"></div>
+        <div class="cv-cell" style="--rd:6.188s"></div>
+        <div class="cv-cell" style="--rd:6.750s"></div>
+        <div class="cv-cell" style="--rd:7.312s"></div>
+        <div class="cv-cell" style="--rd:7.875s"></div>
+        <div class="cv-cell" style="--rd:8.438s"></div>
+      </div>
+      <div class="cv-col" title="event_type">
+        <div class="cv-feed" style="--fd:0.44s"></div>
+        <div class="cv-cell" style="--rd:0.000s"></div>
+        <div class="cv-cell" style="--rd:0.562s"></div>
+        <div class="cv-cell" style="--rd:1.125s"></div>
+        <div class="cv-cell" style="--rd:1.688s"></div>
+        <div class="cv-cell" style="--rd:2.250s"></div>
+        <div class="cv-cell" style="--rd:2.812s"></div>
+        <div class="cv-cell" style="--rd:3.375s"></div>
+        <div class="cv-cell hit" style="--rd:3.938s"></div>
+        <div class="cv-cell hit" style="--rd:4.500s"></div>
+        <div class="cv-cell" style="--rd:5.062s"></div>
+        <div class="cv-cell" style="--rd:5.625s"></div>
+        <div class="cv-cell" style="--rd:6.188s"></div>
+        <div class="cv-cell" style="--rd:6.750s"></div>
+        <div class="cv-cell" style="--rd:7.312s"></div>
+        <div class="cv-cell" style="--rd:7.875s"></div>
+        <div class="cv-cell" style="--rd:8.438s"></div>
+      </div>
+      <div class="cv-col" title="amount">
+        <div class="cv-feed" style="--fd:0.66s"></div>
+        <div class="cv-cell" style="--rd:0.000s"></div>
+        <div class="cv-cell" style="--rd:0.562s"></div>
+        <div class="cv-cell" style="--rd:1.125s"></div>
+        <div class="cv-cell" style="--rd:1.688s"></div>
+        <div class="cv-cell" style="--rd:2.250s"></div>
+        <div class="cv-cell" style="--rd:2.812s"></div>
+        <div class="cv-cell" style="--rd:3.375s"></div>
+        <div class="cv-cell hit" style="--rd:3.938s"></div>
+        <div class="cv-cell hit" style="--rd:4.500s"></div>
+        <div class="cv-cell" style="--rd:5.062s"></div>
+        <div class="cv-cell" style="--rd:5.625s"></div>
+        <div class="cv-cell" style="--rd:6.188s"></div>
+        <div class="cv-cell" style="--rd:6.750s"></div>
+        <div class="cv-cell" style="--rd:7.312s"></div>
+        <div class="cv-cell" style="--rd:7.875s"></div>
+        <div class="cv-cell" style="--rd:8.438s"></div>
+      </div>
+      <div class="cv-col" title="region">
+        <div class="cv-feed" style="--fd:0.88s"></div>
+        <div class="cv-cell" style="--rd:0.000s"></div>
+        <div class="cv-cell" style="--rd:0.562s"></div>
+        <div class="cv-cell" style="--rd:1.125s"></div>
+        <div class="cv-cell" style="--rd:1.688s"></div>
+        <div class="cv-cell" style="--rd:2.250s"></div>
+        <div class="cv-cell" style="--rd:2.812s"></div>
+        <div class="cv-cell" style="--rd:3.375s"></div>
+        <div class="cv-cell hit" style="--rd:3.938s"></div>
+        <div class="cv-cell hit" style="--rd:4.500s"></div>
+        <div class="cv-cell" style="--rd:5.062s"></div>
+        <div class="cv-cell" style="--rd:5.625s"></div>
+        <div class="cv-cell" style="--rd:6.188s"></div>
+        <div class="cv-cell" style="--rd:6.750s"></div>
+        <div class="cv-cell" style="--rd:7.312s"></div>
+        <div class="cv-cell" style="--rd:7.875s"></div>
+        <div class="cv-cell" style="--rd:8.438s"></div>
+      </div>
+    </div>
+  </div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;position:relative;z-index:1;">
+    <div class="crumbs reveal">
+      <span class="crumb on">Lesson 10</span>
+    </div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Real-time <em>OLAP</em><br>serving the results</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">From streaming pipeline to sub-second dashboard. Fresh data, fast queries, and the tradeoff between them.</p>
+    <div class="badges reveal">
+      <span class="badge">ClickHouse</span>
+      <span class="badge">Kafka</span>
+      <span class="badge">FastAPI</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 02 · RECAP ─────────────────────────────────────── -->
+<section class="slide" id="s02" data-speaker="Remind students what they have now: a correct, instrumented stream processing pipeline. Latency distribution is no longer a mystery. The next question is where those results live.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Recap &middot; lesson 9</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">You now have a <em>correct</em> pipeline.</h2>
+    <p class="sub reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)">Lessons 6-9 gave you Kafka, CDC, Spark, Flink, watermarks, and real latency distributions.</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <li>You can measure <strong>processing latency</strong> and <strong>end-to-end latency</strong>.</li>
+      <li>You know micro-batch adds a floor; true streaming removes it at a cost.</li>
+      <li>You know the right choice depends on the SLA, not the brand.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>The new question:</strong> the pipeline emits results, but <em>where do they live</em>, and how do you serve them fast enough that a dashboard user never notices the data is 2 seconds old?</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 03 · PART ONE ──────────────────────────────────── -->
+<section class="slide deep" id="s03" data-speaker="Frame Part one. Everything through Lesson 9 produced correct, timely results in motion. This part asks where those results come to rest, and why the database underneath that decision is not a detail you can defer.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part one</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Where results <em>live</em></h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Why a row store cannot be indexed out of this problem, and what a database has to do differently to answer analytical queries in milliseconds.</p>
+  </div>
+</section>
+
+<!-- ─── 04 · THE TENSION ───────────────────────────────── -->
+<section class="slide" id="s04" data-speaker="Set up the core tension. Fast queries want precomputed answers; fresh data wants raw events. You cannot fully have both.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">the tension</div>
+    <p class="big-q reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Where do analytical results live, and how do you serve them fast enough?</p>
+    <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">Fast query</p>
+        <p class="lede">Pre-compute the answer before the question arrives.</p>
+        <ul class="bullets">
+          <li>Microseconds to single-digit milliseconds.</li>
+          <li>You must <strong>anticipate every question</strong>.</li>
+          <li>Every materialized view is another thing that can break or drift.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">Fresh data</p>
+        <p class="lede">Keep raw events and compute at query time.</p>
+        <ul class="bullets hot">
+          <li>Ask any question, adapt to new dashboards.</li>
+          <li>You need an engine fast enough to scan millions of rows in milliseconds.</li>
+          <li>The faster the raw scan, the less pre-aggregation you need.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 05 · STRAW MAN: JUST ADD AN INDEX ──────────────── -->
+<section class="slide" id="s05" data-speaker="The L1 callback: students already added a B-tree index in Postgres to speed up a lookup. Walk the arithmetic so they feel why that instinct fails for a wide analytical scan, not just hear it asserted. Land on physical layout, not indexing effort, being the real constraint.">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">read amplification</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Just add an <em>index</em>?</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">In Lesson 1 a B-tree index made a Postgres lookup fast. Try the same instinct on an analytical scan.</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <li>A 100M-row <span class="ink-mono">orders</span> table, 12 columns, ~200 bytes/row on disk &rarr; <strong>~20 GB</strong> total.</li>
+      <li>Your query needs 2 of those 12 columns &mdash; <span class="ink-mono">event_type</span> and <span class="ink-mono">amount</span> &mdash; about <strong>~3.3 GB</strong> of actual data.</li>
+      <li>A row store's unit of I/O is the row. To read any column, Postgres pulls the <strong>whole row</strong> off its page &mdash; all 20 GB, not 3.3.</li>
+    </ul>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>6&times; read amplification</strong> &mdash; before a single byte of the answer is computed. An index on <span class="ink-mono">event_type</span> does not fix it: past roughly 5-10% selectivity the planner abandons the index and scans anyway, and even an index-only scan only ever covers the columns you happened to index.</div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">The problem is not indexing effort. It is <strong>physical layout</strong>: row-major storage puts every column of a row on the same page, so touching one column costs you all of them.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 06 · COLUMNAR STORAGE ──────────────────────────── -->
+<section class="slide" id="s06" data-speaker="Flip the layout. Columnar storage is why the same 2-of-12-column query stops paying for the other 10. Explain compression as a direct consequence of sorting, not a separate feature: runs of repeated values and monotonic deltas are what the codec exploits.">
+  <div class="slide-content" style="max-width:min(92vw,960px);margin:0 auto;">
+    <div class="section-marker reveal">storage</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">One file per <em>column</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">MergeTree writes a separate, sorted file per column inside every part. A query opens only the files it names.</p>
+    <div class="two-col reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">Layout</p>
+        <ul class="bullets">
+          <li>A 2-of-12-column query &rarr; ClickHouse opens 2 files, not 12.</li>
+          <li>Each part is immutable: column files plus a sparse index (next slide).</li>
+        </ul>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">Why it compresses</p>
+        <ul class="bullets hot">
+          <li>Sorted by <span class="ink-mono">event_type</span> first &rarr; thousands of identical values in a row &rarr; runs compress to almost nothing.</li>
+          <li><span class="ink-mono">event_time</span> is monotonic within a run &rarr; delta encoding stores small diffs, not full 8-byte timestamps.</li>
+          <li><span class="ink-mono">amount</span> is high-entropy decimals &rarr; little pattern to exploit.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">Compression ratio is a property of the <strong>data's shape</strong>, not the codec. Sorting is what creates that shape.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 07 · COMPRESSION, MEASURED ─────────────────────── -->
+<section class="slide" id="s07" data-speaker="Prediction spoiler. Ask for a show of hands on which of the three columns compresses hardest before revealing. The point: LowCardinality is you telling the engine the data's shape in advance, rather than making it discover the shape statistically.">
+  <div class="slide-content" style="max-width:min(92vw,980px);margin:0 auto;">
+    <div class="section-marker reveal">predict &middot; compression</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">Guess the compression ratio</h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Same table, three columns, very different shapes: <span class="ink-mono">region</span> (a handful of values), <span class="ink-mono">event_time</span> (a timestamp), <span class="ink-mono">amount</span> (high entropy). Predict the ratio for each before you look.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)" data-copy="SELECT\n    column,\n    formatReadableSize(sum(column_data_compressed_bytes))   AS compressed,\n    formatReadableSize(sum(column_data_uncompressed_bytes)) AS uncompressed,\n    round(sum(column_data_uncompressed_bytes) / sum(column_data_compressed_bytes), 1) AS ratio\nFROM system.parts_columns\nWHERE table = 'events' AND active\nGROUP BY column\nORDER BY ratio DESC;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse &middot; system.parts_columns</span></div>
+      <div class="code-body"><span class="r">SELECT</span>
+    column,
+    formatReadableSize(sum(column_data_compressed_bytes))   <span class="r">AS</span> compressed,
+    formatReadableSize(sum(column_data_uncompressed_bytes)) <span class="r">AS</span> uncompressed,
+    round(sum(column_data_uncompressed_bytes) / sum(column_data_compressed_bytes), 1) <span class="r">AS</span> ratio
+<span class="r">FROM</span> <span class="n">system.parts_columns</span>
+<span class="r">WHERE</span> table = <span class="s">'events'</span> <span class="r">AND</span> active
+<span class="r">GROUP BY</span> column
+<span class="r">ORDER BY</span> ratio <span class="r">DESC</span>;</div>
+    </div>
+    <div class="spoiler reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
+      <table class="dtable">
+        <tr><th>Column</th><th>Shape</th><th class="num">Ratio</th></tr>
+        <tr><td class="cool">region</td><td>LowCardinality, ~5 distinct values</td><td class="num">212.9x</td></tr>
+        <tr><td class="cool">event_time</td><td>DateTime64, sorted only within each group</td><td class="num">2.2x</td></tr>
+        <tr><td class="cool">amount</td><td>Decimal, high entropy</td><td class="num">2.4x</td></tr>
+      </table>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">The ratio follows the data, not the engine. <span class="term">LowCardinality</span> is you telling ClickHouse the shape of <span class="ink-mono">region</span> in advance instead of making it discover that statistically.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 08 · PRE-AGG VS ON-THE-FLY ─────────────────────── -->
+<section class="slide" id="s08" data-speaker="Click the contrast. Real systems use both. The architecture decision is which queries justify the operational tax of a materialized view.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">tradeoff</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Pre-aggregation <em>or</em> on-the-fly?</h2>
+    <div class="two-col reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.8rem,1.5vw,1.2rem)">
+        <p class="col-label" style="color:var(--gold)">Pre-aggregation</p>
+        <p class="sub" style="max-width:none">Materialized views, rollup tables, OLAP cubes.</p>
+        <ul class="bullets" style="margin-top:0.6rem">
+          <li>Latency: microseconds.</li>
+          <li>Question must be known in advance.</li>
+          <li>Operational tax: sync, drift, stale data.</li>
+        </ul>
+      </div>
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.8rem,1.5vw,1.2rem)">
+        <p class="col-label" style="color:var(--red)">On-the-fly</p>
+        <p class="sub" style="max-width:none">Raw or lightly transformed events.</p>
+        <ul class="bullets hot" style="margin-top:0.6rem">
+          <li>Latency: depends on scan speed.</li>
+          <li>Ask anything, drill down ad-hoc.</li>
+          <li>Needs a fast columnar engine.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt"><strong>Key insight:</strong> the faster your OLAP engine is at raw scans, the less pre-aggregation you need — and the simpler your system becomes.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 09 · BATCH VS REAL-TIME OLAP ───────────────────── -->
+<section class="slide" id="s09" data-speaker="Place ClickHouse in context. DuckDB is excellent for static data; Snowflake for batch warehouses. Real-time OLAP optimizes for concurrent reads and writes with low latency on both paths.">
+  <div class="slide-content" style="max-width:min(92vw,1100px);margin:0 auto;">
+    <div class="section-marker reveal">landscape</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Batch OLAP <em>vs.</em> real-time OLAP</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <tr><th>Dimension</th><th>DuckDB / Snowflake</th><th>ClickHouse / Pinot / Druid</th></tr>
+      <tr><td>Ingestion model</td><td>Load files, then query</td><td class="cool">Continuous streaming ingestion</td></tr>
+      <tr><td>Ingestion latency</td><td>Seconds to minutes</td><td class="cool">Sub-second to low seconds</td></tr>
+      <tr><td>Query during ingest</td><td>Not designed for it</td><td class="cool">First-class requirement</td></tr>
+      <tr><td>Concurrency model</td><td>Single-writer / isolated warehouses</td><td class="cool">Concurrent readers & writers</td></tr>
+      <tr><td>Best for</td><td>Ad-hoc analysis, batch</td><td class="cool">Live dashboards, user-facing analytics</td></tr>
+    </table>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">ClickHouse is the most database-like of the three: SQL-native, fast raw scans, and a single Docker container is enough for a meaningful class exercise.</p>
+  </div>
+</section>
+
+<!-- ─── 10 · MERGETREE IS AN LSM ───────────────────────── -->
+<section class="slide" id="s10" data-speaker="Connect Lesson 8's RocksDB LSM to ClickHouse's MergeTree directly: same append-only-then-compact structure, but a different job. RocksDB durabilized Flink/Spark windowed state; MergeTree serves ad-hoc OLAP reads. Mention write amplification and the ReplacingMergeTree/CDC tension.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the callback</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">MergeTree is an LSM tree</h2>
+    <div class="arch reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
+Incoming data  ──▶  in-memory buffer / small part on disk
+                       │
+                       ▼
+                immutable part (column files + sparse index)
+                       │
+                       ▼
+             background merges: compact, re-sort, compress
+                       │
+                       ▼
+              fewer, larger parts → fast scans</div>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
+      <li>Writes are append-only: no random I/O, no rewriting existing rows.</li>
+      <li>A CDC stream carries updates and deletes (Lesson 5); MergeTree is append-only &mdash; <span class="term">ReplacingMergeTree</span> is how the merge resolves that tension.</li>
+      <li><strong>Tradeoff:</strong> write amplification. A row may be rewritten 3-5 times before it reaches its final merged state.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">You already met this shape in <strong>Lesson 8</strong>: RocksDB held Spark/Flink's windowed state as an LSM tree, same append-then-compact structure. <strong>Different job</strong> &mdash; RocksDB durabilizes streaming state; MergeTree serves the query.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 11 · THE SPARSE PRIMARY INDEX ──────────────────── -->
+<section class="slide" id="s11" data-speaker="The most important new mechanism in this part. ClickHouse indexes granules, not rows — one mark per 8192 rows. Walk the WHERE event_type='purchase' AND region='eu' example concretely: contiguous range when ORDER BY starts with those columns, full scan when it doesn't. Say explicitly that Part two's ORDER BY experiment measures exactly this.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the sparse index</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">ClickHouse does not index <em>every row</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem">One mark per granule &mdash; 8192 rows by default. For 100M rows that's ~12,200 marks; for a billion, ~122,000. Small enough to sit in memory.</p>
+    <div class="arch reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+primary.idx:  mark0         mark1         mark2         mark3
+              (purchase,eu) (purchase,us) (refund,eu)   (view,us)
+                  │             │             │             │
+                  ▼             ▼             ▼             ▼
+               granule0 ──── granule1 ──── granule2 ──── granule3
+               8192 rows     8192 rows     8192 rows     8192 rows
+
+WHERE event_type='purchase' AND region='eu'
+  → binary-search the marks, range = [granule0]  → skip the rest</div>
+    <ul class="bullets reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <li>The filter matches the <span class="ink-mono">(event_type, region, event_time)</span> ORDER BY prefix &rarr; matching rows are contiguous &rarr; one bounded range of granules.</li>
+      <li>Filter on a column <em>not</em> in that prefix (say, <span class="ink-mono">user_id</span>) &rarr; matches scatter across every granule &rarr; the engine reads them all.</li>
+    </ul>
+    <div class="callout proof reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">This is the mechanism Part two's <span class="term">ORDER BY</span> experiment measures directly: same data, two sort orders, an order-of-magnitude difference in granules scanned.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 12 · THE SOURCE TABLE ──────────────────────────── -->
+<section class="slide" id="s12" data-speaker="Show the source table first. The ORDER BY is the primary index; LowCardinality is ClickHouse's dictionary encoding. Emphasize this is a table-level decision, and that the DDL on screen is exactly what setup_clickhouse.py runs.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">schema</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The source table</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">MergeTree stores immutable parts, sorted by the <span class="term">ORDER BY</span> key. That key is the primary index.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)" data-copy="CREATE TABLE IF NOT EXISTS events (\n    event_time DateTime64(3),\n    user_id UInt32,\n    event_type LowCardinality(String),\n    amount Decimal(10, 2),\n    region LowCardinality(String)\n) ENGINE = MergeTree()\nPARTITION BY toYYYYMMDD(event_time)\nORDER BY (event_type, region, event_time)\nSETTINGS index_granularity = 8192;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse</span></div>
+      <div class="code-body"><span class="cm">-- raw event store</span>
+<span class="r">CREATE TABLE IF NOT EXISTS</span> <span class="n">events</span> (
+    event_time <span class="gy">DateTime64</span>(3),
+    user_id <span class="gy">UInt32</span>,
+    event_type <span class="gy">LowCardinality</span>(String),
+    amount <span class="gy">Decimal</span>(10, 2),
+    region <span class="gy">LowCardinality</span>(String)
+) <span class="r">ENGINE</span> = <span class="gy">MergeTree</span>()
+<span class="r">PARTITION BY</span> toYYYYMMDD(event_time)
+<span class="r">ORDER BY</span> (event_type, region, event_time)
+<span class="r">SETTINGS</span> index_granularity = 8192;</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>LowCardinality(String)</strong> is explicit dictionary encoding for columns with few distinct values. DuckDB does this automatically; ClickHouse makes you declare it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 13 · THE KAFKA ENGINE TABLE ─────────────────────── -->
+<section class="slide" id="s13" data-speaker="Neither of these has been on a slide before, and they are the genuinely new mechanism of this lesson. events_kafka is a consumer group, not a table you query — SELECTing from it consumes the topic. Land the L2 callback explicitly: this is your fourth log, after the Postgres WAL, the replication slot, and the Kafka topic itself. Delivery is at-least-once. Name the four settings; Part two tunes all of them.">
+  <div class="slide-content" style="max-width:min(92vw,1020px);margin:0 auto;">
+    <div class="section-marker reveal">the fourth log</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem)">The <em>Kafka engine</em> table</h2>
+    <p class="sub reveal" style="margin-top:0.3rem">events_kafka is a consumer, not a query target. Selecting from it consumes messages from the topic.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem)" data-copy="CREATE TABLE IF NOT EXISTS events_kafka (\n    event_time String,\n    user_id UInt32,\n    event_type String,\n    amount Decimal(10, 2),\n    region String\n) ENGINE = Kafka()\nSETTINGS\n    kafka_broker_list = 'kafka:9092',\n    kafka_topic_list = 'events',\n    kafka_group_name = 'clickhouse-consumer-l10',\n    kafka_format = 'JSONEachRow',\n    kafka_max_block_size = 1000,\n    kafka_poll_timeout_ms = 100,\n    kafka_flush_interval_ms = 1000,\n    kafka_auto_offset_reset = 'earliest';\n\nCREATE MATERIALIZED VIEW IF NOT EXISTS events_kafka_mv TO events AS\nSELECT\n    parseDateTime64BestEffort(event_time) AS event_time,\n    user_id,\n    event_type,\n    amount,\n    region\nFROM events_kafka;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse</span></div>
+      <div class="code-body"><span class="r">CREATE TABLE IF NOT EXISTS</span> <span class="n">events_kafka</span> (
+    event_time <span class="gy">String</span>,
+    user_id <span class="gy">UInt32</span>,
+    event_type <span class="gy">String</span>,
+    amount <span class="gy">Decimal</span>(10, 2),
+    region <span class="gy">String</span>
+) <span class="r">ENGINE</span> = <span class="gy">Kafka</span>()
+<span class="r">SETTINGS</span>
+    kafka_broker_list = <span class="s">'kafka:9092'</span>,
+    kafka_topic_list = <span class="s">'events'</span>,
+    kafka_group_name = <span class="s">'clickhouse-consumer-l10'</span>,
+    kafka_format = <span class="s">'JSONEachRow'</span>,
+    kafka_max_block_size = 1000,
+    kafka_poll_timeout_ms = 100,
+    kafka_flush_interval_ms = 1000,
+    kafka_auto_offset_reset = <span class="s">'earliest'</span>;
+
+<span class="r">CREATE MATERIALIZED VIEW IF NOT EXISTS</span> <span class="n">events_kafka_mv</span> <span class="r">TO</span> events <span class="r">AS</span>
+<span class="r">SELECT</span>
+    parseDateTime64BestEffort(event_time) <span class="r">AS</span> event_time,
+    user_id,
+    event_type,
+    amount,
+    region
+<span class="r">FROM</span> events_kafka;</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>This is a Kafka consumer group.</strong> <span class="ink-mono">kafka_group_name = 'clickhouse-consumer-l10'</span> commits offsets like any other consumer &mdash; your fourth log, after the Postgres WAL, the replication slot, and the Kafka topic itself. Delivery is at-least-once: a crash between poll and flush can replay a block. <strong>Part two tunes</strong> <span class="ink-mono">kafka_max_block_size</span>, <span class="ink-mono">kafka_poll_timeout_ms</span>, <span class="ink-mono">kafka_flush_interval_ms</span> &mdash; together they set the floor on ingestion latency. (<span class="ink-mono">auto.offset.reset</span> is a librdkafka property, not a table setting: it lives in <span class="ink-mono">config/clickhouse-kafka.xml</span>.)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 14 · BREAK 01 ──────────────────────────────────── -->
+<section class="slide deep" id="s14" data-speaker="Break before Part two. Part two turns the four Kafka settings from the previous slide into a live experiment: ingestion latency vs. query latency, measured, not asserted.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Break 01</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Stretch. <em>Then</em> turn the knobs.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Part two wires the stack up live and tunes the four Kafka settings from the last slide, measuring ingestion latency against query latency as the knobs move.</p>
+  </div>
+</section>
+
+<!-- ─── 20 · PART TWO DIVIDER ───────────────────────────── -->
+<section class="slide deep" id="s20" data-speaker="Transition slide. Hour 1 was schema and theory: raw table, materialized view, the ingestion/query tradeoff in the abstract. Hour 2 is hands on: bring the stack up, watch the MV fire, then measure freshness and query latency for real.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part two</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Wire it, <em>then</em> measure it.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Docker up, the Kafka engine consuming, materialized views firing on insert. Then: how fresh is the data, and how fast are the queries, while both are happening at once?</p>
+  </div>
+</section>
+
+<!-- ─── 21 · ARCHITECTURE ──────────────────────────────── -->
+<section class="slide" id="s21" data-speaker="Walk the full write path left to right, then the read path. events_kafka is a consumer, not storage — it holds no rows at rest. Two materialized views fire on insert: one moves Kafka rows into events, the other keeps the rollup current. FastAPI reads from both events and the aggregate table depending on the endpoint.">
+  <div class="slide-content" style="max-width:min(94vw,1150px);margin:0 auto;">
+    <div class="section-marker reveal">wiring</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Kafka &rarr; ClickHouse &rarr; FastAPI</h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Two materialized views, not one. Both fire on <span class="term">INSERT</span>, not on a schedule.</p>
+    <div class="flow reveal" style="justify-content:center;margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <div class="box">producer</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--red);color:var(--red)">Kafka</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--gold);color:var(--gold)">events_kafka</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--gold);color:var(--gold)">events_kafka_mv</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box">events</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--gold);color:var(--gold)">revenue_by_region_minute_mv</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box">revenue_by_region_minute</div>
+    </div>
+    <div class="flow reveal" style="justify-content:center">
+      <div class="box">FastAPI</div>
+      <span class="arrow">&larr;</span>
+      <div class="box" style="border-color:var(--gold);color:var(--gold)">revenue_by_region_minute</div>
+      <span class="arrow">&harr;</span>
+      <div class="box">events</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>events_kafka</strong> is a Kafka-engine table — a consumer group (Lesson 6's fourth log), not storage. <span class="ink-mono">events_kafka_mv</span> and <span class="ink-mono">revenue_by_region_minute_mv</span> are both triggers: each runs once per inserted block.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 22 · BRING THE STACK UP ────────────────────────── -->
+<section class="slide" id="s22" data-speaker="Run these four in order, each in sequence, before touching anything else. The port-conflict warning matters — several students last cohort spent twenty minutes debugging a silent connection failure that was just kafka-l9 still holding the port.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">bring it up</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Four commands, in order.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Containers, topic, schema, then the firehose.</p>
+    <div class="reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem);display:flex;flex-direction:column;gap:clamp(0.35rem,0.8vh,0.55rem)">
+      <div class="prompt" data-copy="docker compose up -d">
+        <span class="plabel">1 &middot; start the containers</span>
+        <span class="pcmd">docker compose up -d</span>
+      </div>
+      <div class="prompt" data-copy="uv run python src/setup_topics.py --reset">
+        <span class="plabel">2 &middot; create the kafka topic</span>
+        <span class="pcmd">uv run python src/setup_topics.py --reset</span>
+      </div>
+      <div class="prompt" data-copy="uv run python src/setup_clickhouse.py">
+        <span class="plabel">3 &middot; create the tables and MVs</span>
+        <span class="pcmd">uv run python src/setup_clickhouse.py</span>
+      </div>
+      <div class="prompt" data-copy="uv run python src/producer.py --rate 1000 --duration-seconds 600">
+        <span class="plabel">4 &middot; start producing</span>
+        <span class="pcmd">uv run python src/producer.py --rate 1000 --duration-seconds 600</span>
+      </div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>Port conflict:</strong> Lesson 9's Kafka container (<span class="ink-mono">kafka-l9</span>) also binds <span class="ink-mono">localhost:19092</span>. If it's still running, <span class="ink-mono">docker stop kafka-l9</span> before step 1.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 23 · THE PRE-AGGREGATION MV ────────────────────── -->
+<section class="slide" id="s23" data-speaker="This is the heart of the lesson. In ClickHouse a materialized view is a trigger on INSERT, not a cached result. Emphasize -State and -Merge — the next slide makes the gotcha explicit.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">trigger on insert</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">A materialized view is a <em>trigger</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">When data arrives in <span class="term">events</span>, the MV runs on the new block and writes partial aggregates to <span class="term">revenue_by_region_minute</span>.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)" data-copy="CREATE TABLE revenue_by_region_minute (\n    minute DateTime,\n    region LowCardinality(String),\n    total_revenue AggregateFunction(sum, Decimal(10, 2)),\n    purchase_count AggregateFunction(count),\n    unique_users AggregateFunction(uniq, UInt32)\n) ENGINE = AggregatingMergeTree()\nORDER BY (region, minute);\n\nCREATE MATERIALIZED VIEW revenue_by_region_minute_mv\nTO revenue_by_region_minute AS\nSELECT\n    toStartOfMinute(event_time) AS minute,\n    region,\n    sumState(amount) AS total_revenue,\n    countState() AS purchase_count,\n    uniqState(user_id) AS unique_users\nFROM events\nWHERE event_type = 'purchase'\nGROUP BY minute, region;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">sql/init_clickhouse.sql</span></div>
+      <div class="code-body"><span class="r">CREATE TABLE</span> <span class="n">revenue_by_region_minute</span> (
+    minute <span class="gy">DateTime</span>,
+    region <span class="gy">LowCardinality</span>(String),
+    total_revenue <span class="gy">AggregateFunction</span>(sum, Decimal(10, 2)),
+    purchase_count <span class="gy">AggregateFunction</span>(count),
+    unique_users <span class="gy">AggregateFunction</span>(uniq, UInt32)
+) <span class="r">ENGINE</span> = <span class="gy">AggregatingMergeTree</span>()
+<span class="r">ORDER BY</span> (region, minute);
+
+<span class="r">CREATE MATERIALIZED VIEW</span> <span class="n">revenue_by_region_minute_mv</span>
+<span class="r">TO</span> revenue_by_region_minute <span class="r">AS</span>
+<span class="r">SELECT</span>
+    toStartOfMinute(event_time) <span class="r">AS</span> minute,
+    region,
+    sumState(amount) <span class="r">AS</span> total_revenue,
+    countState() <span class="r">AS</span> purchase_count,
+    uniqState(user_id) <span class="r">AS</span> unique_users
+<span class="r">FROM</span> events
+<span class="r">WHERE</span> event_type = <span class="s">'purchase'</span>
+<span class="r">GROUP BY</span> minute, region;</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>Gotcha:</strong> those <span class="ink-mono">-State</span> columns don't hold numbers. Next slide.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 24 · -STATE AND -MERGE ─────────────────────────── -->
+<section class="slide" id="s24" data-speaker="This is the #1 mistake students make with AggregatingMergeTree. sumState on write produces an opaque binary state, not a number. sumMerge on read decodes it. FINAL is the reflex everyone reaches for and it is the expensive wrong answer — it forces a synchronous merge of every matching part at query time, and it doesn't even finish the job: you still need -Merge to turn the merged state into a value.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">gotcha</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">A partial aggregation state is <em class="hot">not a number</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem"><span class="ink-mono">total_revenue</span> is typed <span class="term">AggregateFunction(sum, Decimal(10,2))</span>. Read it raw and you get an unreadable binary state, not a revenue figure.</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <li><strong>Write:</strong> <span class="ink-mono">sumState</span> / <span class="ink-mono">countState</span> / <span class="ink-mono">uniqState</span> — one partial state per insert block, per key.</li>
+      <li><strong>Read:</strong> <span class="ink-mono">sumMerge</span> / <span class="ink-mono">countMerge</span> / <span class="ink-mono">uniqMerge</span> — combine whatever states matched. This is what <span class="ink-mono">/api/revenue</span> calls, every time.</li>
+      <li><strong>Not FINAL:</strong> FINAL forces a synchronous merge of every matching part before it answers — the background work you pre-aggregated to avoid, now on your query's clock, worst exactly when parts are piling up fastest. It doesn't even decode the state — you'd still need <span class="ink-mono">-Merge</span> afterward.</li>
+    </ul>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)" data-copy="SELECT\n    minute,\n    region,\n    sumMerge(total_revenue) AS revenue,\n    countMerge(purchase_count) AS purchases,\n    uniqMerge(unique_users) AS unique_users\nFROM revenue_by_region_minute\nWHERE minute >= now() - INTERVAL {minutes:UInt16} MINUTE\nGROUP BY minute, region\nORDER BY minute DESC, region">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">src/app.py &middot; GET /api/revenue</span></div>
+      <div class="code-body"><span class="r">SELECT</span>
+    minute,
+    region,
+    sumMerge(total_revenue) <span class="r">AS</span> revenue,
+    countMerge(purchase_count) <span class="r">AS</span> purchases,
+    uniqMerge(unique_users) <span class="r">AS</span> unique_users
+<span class="r">FROM</span> <span class="n">revenue_by_region_minute</span>
+<span class="r">WHERE</span> minute >= now() - <span class="r">INTERVAL</span> {minutes:UInt16} <span class="r">MINUTE</span>
+<span class="r">GROUP BY</span> minute, region
+<span class="r">ORDER BY</span> minute <span class="r">DESC</span>, region</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 25 · THREE ENDPOINTS, THREE QUERY SHAPES ───────── -->
+<section class="slide" id="s25" data-speaker="Same ClickHouse instance, same firehose. Walk the three endpoints in src/app.py. revenue hits the pre-agg MV. throughput is a raw scan but the GROUP BY key (minute) has almost no cardinality. top-users is a raw scan with a GROUP BY on user_id, which can fan out to 100,000 distinct groups — that's the L1 hot-row problem again, just as a wide aggregation instead of a single UPDATE.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">query shapes</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Three endpoints, three <em>query shapes</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Same instance, same firehose. Each endpoint touches a different amount of data.</p>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <tr><th>Endpoint</th><th>Source</th><th>GROUP BY</th><th>Cardinality</th></tr>
+      <tr><td class="cool">/api/revenue</td><td>revenue_by_region_minute (pre-agg)</td><td>minute, region</td><td>dozens of keys, already computed</td></tr>
+      <tr><td>/api/throughput</td><td>events (raw scan)</td><td>minute</td><td>dozens of keys, full scan of the window</td></tr>
+      <tr><td class="hot">/api/top-users</td><td>events (raw scan)</td><td>user_id</td><td class="hot">up to 100,000 keys</td></tr>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">Every response carries a <span class="ink-mono">query_ms</span> field, timed server-side around just the ClickHouse call — not the network round trip.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 26 · PREDICT THE THREE ─────────────────────────── -->
+<section class="slide" id="s26" data-speaker="Get the room to actually rank these out loud before revealing. Most students guess revenue fastest, top-users slowest — the interesting question is how many orders of magnitude apart they land.">
+  <div class="slide-content" style="max-width:min(92vw,950px);margin:0 auto;">
+    <div class="section-marker reveal">predict</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Rank the three by p50 <em class="hot">latency</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Fastest to slowest. Same order of magnitude, or worlds apart?</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <li><span class="ink-mono">curl "http://localhost:8000/api/revenue?minutes=5"</span></li>
+      <li><span class="ink-mono">curl "http://localhost:8000/api/throughput?minutes=10"</span></li>
+      <li><span class="ink-mono">curl "http://localhost:8000/api/top-users?minutes=5&amp;limit=10"</span></li>
+    </ul>
+    <div class="spoiler reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <table class="dtable">
+        <tr><th>Endpoint</th><th class="num">p50 query_ms</th></tr>
+        <tr><td>/api/revenue</td><td class="num cool">4.2 ms</td></tr>
+        <tr><td>/api/throughput</td><td class="num">19.7 ms</td></tr>
+        <tr><td>/api/top-users</td><td class="num hot">8.9 ms</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 27 · INGESTION VS QUERY LATENCY ────────────────── -->
+<section class="slide" id="s27" data-speaker="This is the conceptual core. Tighter flush intervals lower ingestion latency but create more parts, which hurts queries until merges catch up.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">the core tradeoff</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Ingestion latency <em>vs.</em> query latency</h2>
+    <div class="two-col reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="col">
+        <p class="stat cool" style="font-size:clamp(1.2rem,3vw,2rem)">freshness</p>
+        <p class="sub" style="max-width:none">How long after an event occurs before it is queryable?</p>
+        <ul class="bullets" style="margin-top:0.5rem">
+          <li>Controlled by <span class="term">kafka_max_block_size</span></li>
+          <li>Smaller blocks = lower latency</li>
+          <li>But more parts to scan</li>
+        </ul>
+      </div>
+      <div class="col">
+        <p class="stat red" style="font-size:clamp(1.2rem,3vw,2rem)">query speed</p>
+        <p class="sub" style="max-width:none">How long does a query take to return?</p>
+        <ul class="bullets hot" style="margin-top:0.5rem">
+          <li>More parts = more index lookups</li>
+          <li>Controlled by merge aggressiveness</li>
+          <li>Merge work competes with queries for CPU/I/O</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt"><strong>The right knob depends on the dashboard SLA.</strong> 5-second refresh? 2-3s ingestion latency is fine. Fraud alert? Push smaller batches and accept more query overhead.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 28 · FRESHNESS, MEASURED ───────────────────────── -->
+<section class="slide" id="s28" data-speaker="Demo the canary event. Produce a unique event, poll ClickHouse until it appears, and report the distribution. Same measurement discipline as Lesson 9 — canary events instead of watermark telemetry. Get a prediction before revealing.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">measure</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">How fresh is the data?</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Send a canary event with a unique <span class="term">user_id</span>, then poll ClickHouse until it appears. Report min/p50/p95/max.</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)" data-copy="uv run python src/measure_freshness.py --runs 10">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python src/measure_freshness.py --runs 10</span>
+    </div>
+    <p class="lede reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem);font-size:clamp(0.85rem,1.5vw,1.05rem)">Predict: is p50 closer to 200ms, 2 seconds, or 20 seconds?</p>
+    <div class="spoiler reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="code-block">
+        <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">measure_freshness.py --runs 10</span></div>
+        <div class="code-body">  run 01: 0.10s
+  run 02: 0.01s
+  ...
+
+  min:  0.01s
+  p50:  0.05s
+  p95:  1.06s
+  max:  1.06s</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 29 · FIND THE FLOOR ────────────────────────────── -->
+<section class="slide" id="s29" data-speaker="The highlight of the hour, and it repeats Lesson 9's move exactly: sweep a knob until the number stops moving. There it was the Spark trigger hitting the watermark; here it's kafka_max_block_size hitting kafka_poll_timeout_ms / kafka_flush_interval_ms, both hardcoded at 100ms and 1000ms in the Kafka engine settings. Ask the class to predict before running it or revealing.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the floor, again</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Which knob is the <em class="hot">floor</em>?</h2>
+    <p class="sub reveal" style="margin-top:0.4rem"><span class="ink-mono">src/demo_ingest_floor.py</span> sweeps two settings, one canary each, timed until ClickHouse can see it. Act 1 moves <span class="term">kafka_max_block_size</span> over a 1000&times; range; act 2 moves <span class="term">kafka_flush_interval_ms</span>. <strong>Predict which one moves the number.</strong></p>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.75rem)" data-copy="uv run python src/demo_ingest_floor.py">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python src/demo_ingest_floor.py</span>
+    </div>
+    <div class="spoiler reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <div class="code-block">
+        <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">which knob is the floor?</span></div>
+        <div class="code-body"><span class="cm">  ACT 1 · block size, flush fixed at 1000ms</span>
+  kafka_max_block_size  =  65536:  1.49s
+  kafka_max_block_size  =     64:  1.51s   <span class="r">&lt;-- flat across 1000x</span>
+
+<span class="cm">  ACT 2 · flush interval, block size fixed at 1000</span>
+  kafka_flush_interval_ms =  2000:  1.65s
+  kafka_flush_interval_ms =  1000:  1.51s
+  kafka_flush_interval_ms =   500:  1.03s
+  kafka_flush_interval_ms =   100:  0.11s  <span class="gy">&lt;-- there it is</span></div>
+      </div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>One canary never fills a block of any size</strong> — so the block size cannot be what ends the batch. The flush timer is. Block size only binds once the stream is fast enough to fill a block before the timer fires, which is why the same canary under a 1000/s producer arrives in <span class="ink-mono">0.05s</span>. Which knob matters depends on your arrival rate.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 30 · BREAK 02 ──────────────────────────────────── -->
+<section class="slide deep" id="s30" data-speaker="Second break. After this: hammer the API while the producer is still at full rate, learn to diagnose a slow ClickHouse from system tables, and close the loop on why the ORDER BY choice was the biggest decision in the whole lesson.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Break 02</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Back in <em>10.</em></h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Leave the producer running. Next: query latency under load, diagnosing a slow ClickHouse from system tables, and the ORDER BY payoff.</p>
+  </div>
+</section>
+
+<!-- ─── 31 · QUERY LATENCY UNDER LOAD ──────────────────── -->
+<section class="slide" id="s31" data-speaker="Hammer the API while the producer is running. The point is that reads and writes coexist — that was the entire argument for a real-time OLAP engine back in Part one. demo_query_pressure.py is the self-contained version: it spins up its own producer thread so you don't need a second terminal.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">reads and writes coexist</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Query latency while ingestion runs</h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Concurrent HTTP clients against the dashboard while the producer is still at full rate.</p>
+    <div class="reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem);display:flex;flex-direction:column;gap:clamp(0.35rem,0.7vh,0.5rem)">
+      <div class="prompt" data-copy="uv run python src/query_loadtest.py \\\n  --endpoint &quot;http://localhost:8000/api/revenue?minutes=5&quot; \\\n  --clients 10">
+        <span class="plabel">against a running producer + FastAPI</span>
+        <span class="pcmd">uv run python src/query_loadtest.py \
+            --endpoint "http://localhost:8000/api/revenue?minutes=5" \
+            --clients 10</span>
+      </div>
+      <div class="prompt" data-copy="uv run python src/demo_query_pressure.py --endpoint &quot;http://localhost:8000/api/throughput?minutes=2&quot; --rate 1000 --clients 8">
+        <span class="plabel">self-contained (spins up its own producer thread)</span>
+        <span class="pcmd">uv run python src/demo_query_pressure.py --endpoint "http://localhost:8000/api/throughput?minutes=2" --rate 1000 --clients 8</span>
+      </div>
+    </div>
+    <div class="spoiler reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <table class="dtable">
+        <tr><th></th><th class="num">total round-trip (ms)</th><th class="num">ClickHouse-side (ms)</th></tr>
+        <tr><td>p50</td><td class="num">7.3 ms</td><td class="num cool">5.6 ms</td></tr>
+        <tr><td>p95</td><td class="num">10.9 ms</td><td class="num cool">8.9 ms</td></tr>
+        <tr><td>p99</td><td class="num">63.5 ms</td><td class="num cool">52.9 ms</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 32 · DIAGNOSE IT ───────────────────────────────── -->
+<section class="slide" id="s32" data-speaker="Operational literacy. If a query slows down under load, this is where you look before you touch the schema. active_parts climbing means merges are losing the race against inserts. system.merges shows exactly what's running right now and competing with your query for the same CPU and I/O.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">diagnose</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">When query latency degrades, <em class="hot">look here</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem">Two system tables answer the question directly: are merges keeping up with inserts?</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)" data-copy="SELECT table, count() AS active_parts, sum(rows) AS total_rows\nFROM system.parts\nWHERE active AND table IN ('events', 'revenue_by_region_minute')\nGROUP BY table;\n\nSELECT table, elapsed, progress, num_parts\nFROM system.merges;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse</span></div>
+      <div class="code-body"><span class="cm">-- how many active (unmerged) parts per table?</span>
+<span class="r">SELECT</span> table, count() <span class="r">AS</span> active_parts, sum(rows) <span class="r">AS</span> total_rows
+<span class="r">FROM</span> <span class="n">system.parts</span>
+<span class="r">WHERE</span> active <span class="r">AND</span> table <span class="r">IN</span> (<span class="s">'events'</span>, <span class="s">'revenue_by_region_minute'</span>)
+<span class="r">GROUP BY</span> table;
+
+<span class="cm">-- what's merging right now, and how far along?</span>
+<span class="r">SELECT</span> table, elapsed, progress, num_parts
+<span class="r">FROM</span> <span class="n">system.merges</span>;</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>active_parts climbing over time</strong> means the merge scheduler is falling behind the insert rate — every query now opens more files and does more index lookups. Merges are background CPU and I/O work; under a full-rate producer they compete directly with your dashboard queries for the same machine.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 33 · THE ORDER BY PAYOFF ───────────────────────── -->
+<section class="slide" id="s33" data-speaker="Same data, two sort orders, very different granule skipping. The ORDER BY is not a preference, it's the primary index — the ClickHouse equivalent of picking the right index in Postgres, except it's a table-design-time decision, not something you bolt on later. Soften the closing claim: Part three's skip indices and projections are partial escape hatches, not full ones, and they don't replace a good primary sort order.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">the payoff</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The <span class="term">ORDER BY</span> is the primary index</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Two tables, identical data, different physical sort orders. Same <span class="term">user_id</span> filter, compared with <span class="ink-mono">EXPLAIN indexes = 1</span>.</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)" data-copy="uv run python src/experiment_order_by.py">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python src/experiment_order_by.py</span>
+    </div>
+    <div class="spoiler reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <table class="dtable">
+        <tr><th>Query</th><th>Table</th><th class="num">Granules</th><th class="num">Latency</th></tr>
+        <tr><td>time range, last 5 min</td><td class="cool">events</td><td class="num">71 / 2 446</td><td class="num">6.2 ms</td></tr>
+        <tr><td>user_id = 42 (bad match)</td><td class="cool">events</td><td class="num hot">2 446 / 2 446</td><td class="num hot">14.1 ms</td></tr>
+        <tr><td>user_id = 42 (good match)</td><td class="cool">events_by_user</td><td class="num cool">1 / 49</td><td class="num cool">1.9 ms</td></tr>
+      </table>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt"><strong>You pick the ORDER BY once</strong>, based on your dominant query pattern. Of every decision in this schema, it has the largest impact and is the least reversible — changing it means rewriting the table. Skip indices and projections, coming in Part three, are partial escape hatches. They don't replace a good primary sort order.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 40 · PART THREE DIVIDER ────────────────────────── -->
+<section class="slide deep" id="s40" data-speaker="Open the final stretch. Everything so far assumed a clean, append-only, insert-only world. Now break that assumption on purpose: duplicates, updates, deletes, and the real cost of fixing them at read time. Close with whether the last four lessons were even necessary, and where the whole course lands.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part three</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The <em>hard</em> parts.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Everything so far assumed inserts only arrive once and never change. Duplicates, updates, and deletes say otherwise &mdash; and then we ask whether any of the last four lessons were necessary at all.</p>
+  </div>
+</section>
+
+<!-- ─── 41 · DUPLICATES ─────────────────────────────────── -->
+<section class="slide" id="s41" data-speaker="The Kafka engine's consumer group commits its offset after the insert succeeds, not before. A restart between those two steps replays the block. Nothing crashes, nothing errors -- the revenue total is just wrong. Walk through insert_deduplication_token as the narrow fix, then point at ReplacingMergeTree as the structural answer, which the next two slides build out.">
+  <div class="slide-content" style="max-width:min(92vw,960px);margin:0 auto;">
+    <div class="section-marker reveal">gotcha</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">At-least-once means <em class="hot">at least</em>.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">The Kafka table engine is a consumer group. Every consumer group in this course has been at-least-once. This is where that guarantee lands on your revenue number.</p>
+    <div class="callout danger reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>The failure:</strong> ClickHouse commits a Kafka block's offset only after the insert into <span class="ink-mono">events</span> succeeds. Restart between those two steps &mdash; OOM, deploy, a dropped connection &mdash; and on reconnect it re-reads the same block. <span class="ink-mono">events</span> has no primary key to reject it: row count goes up by one full block (<span class="ink-mono">kafka_max_block_size</span> rows), <span class="ink-mono">sum(amount)</span> goes up by whatever that block summed to. No error. No warning.</div>
+    </div>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <li><span class="term">insert_deduplication_token</span> &mdash; tag each insert with a token derived from the Kafka partition + offset range; a replayed block gets the same token and ClickHouse drops it. Requires <span class="ink-mono">non_replicated_deduplication_window &gt; 0</span> &mdash; off by default on plain MergeTree, and only works if you control the insert path yourself.</li>
+      <li><span class="term">ReplacingMergeTree</span> &mdash; stop trying to prevent the duplicate and make the table indifferent to it instead. The structural answer, next slide.</li>
+    </ul>
+    <table class="dtable reveal spoiler" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <tr><th>Table engine</th><th class="num">count() after the same block lands twice</th></tr>
+      <tr><td>MergeTree (today's <span class="ink-mono">events</span>)</td><td class="num hot">6 &nbsp;(was 3)</td></tr>
+      <tr><td>ReplacingMergeTree, after FINAL</td><td class="num cool">3</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─── 42 · UPDATES AND DELETES ───────────────────────── -->
+<section class="slide" id="s42" data-speaker="The biggest hole in the course as it stands. Lesson 5's CDC stream carried I/U/D and you applied it to DuckDB with DELETE + INSERT, the idempotent move from Lesson 4. MergeTree has neither primitive in the streaming write path. Show ReplacingMergeTree with a version column and the is_deleted tombstone, and land hard on the fact that dedup is a merge-time event you don't control -- that's what the spoiler is testing.">
+  <div class="slide-content" style="max-width:min(92vw,980px);margin:0 auto;">
+    <div class="section-marker reveal">closing the loop &middot; lesson 5</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Where do <em>U</em> and <em>D</em> go?</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Lesson 5's CDC stream emitted <span class="ink-mono">"action": "I" / "U" / "D"</span>, applied to DuckDB with idempotent <span class="ink-mono">DELETE</span> + <span class="ink-mono">INSERT</span>. MergeTree has no per-row <span class="ink-mono">DELETE</span> or <span class="ink-mono">UPDATE</span> in that path. Every action becomes an <span class="ink-mono">INSERT</span>.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)" data-copy="CREATE TABLE orders (\n    id UInt64,\n    status LowCardinality(String),\n    updated_at DateTime64(3),\n    _version UInt64,\n    is_deleted UInt8\n) ENGINE = ReplacingMergeTree(_version, is_deleted)\nORDER BY id;\n\n-- I and U: INSERT, is_deleted = 0, _version = event epoch ms\n-- D:        INSERT, is_deleted = 1, same row otherwise unchanged">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse</span></div>
+      <div class="code-body"><span class="r">CREATE TABLE</span> <span class="n">orders</span> (
+    id <span class="gy">UInt64</span>,
+    status <span class="gy">LowCardinality</span>(String),
+    updated_at <span class="gy">DateTime64</span>(3),
+    _version <span class="gy">UInt64</span>,
+    is_deleted <span class="gy">UInt8</span>
+) <span class="r">ENGINE</span> = <span class="gy">ReplacingMergeTree</span>(_version, is_deleted)
+<span class="r">ORDER BY</span> id;
+
+<span class="cm">-- I and U: INSERT, is_deleted = 0, _version = event epoch ms</span>
+<span class="cm">-- D:        INSERT, is_deleted = 1, same row otherwise unchanged</span></div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>Dedup happens at merge time</strong>, and merges run on ClickHouse's own schedule &mdash; not yours. A query between two merges can see one version, the other, or both. Use <span class="term">FINAL</span> or an aggregation that tolerates duplicates. Never trust a raw <span class="ink-mono">SELECT</span> on a ReplacingMergeTree.</div>
+    </div>
+    <div class="reveal spoiler" style="display:flex;gap:clamp(1.2rem,4vw,3rem);flex-wrap:wrap;margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div><div class="stat red">2</div><div class="stat-label">rows for id=42, right after I then U land</div></div>
+      <div><div class="stat cool">1</div><div class="stat-label">rows for id=42, after a merge (or FINAL)</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 43 · WHAT FINAL COSTS ──────────────────────────── -->
+<section class="slide" id="s43" data-speaker="FINAL is correct but not free: it forces a merge-on-read across every part touching the queried key range. Give the two alternatives real weight, then land the frame that carries the rest of the course close: correctness and latency trade against each other on purpose, and the discipline is choosing knowingly instead of taking the default.">
+  <div class="slide-content" style="max-width:min(92vw,960px);margin:0 auto;">
+    <div class="section-marker reveal">tradeoff</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">What <span class="term">FINAL</span> costs.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem"><span class="ink-mono">SELECT ... FROM orders FINAL</span> forces ClickHouse to merge every part touching your key range, in memory, before it answers. Correct, but not free.</p>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <tr><th>Approach</th><th>Correctness</th><th>Cost</th></tr>
+      <tr><td>FINAL</td><td class="cool">Always correct</td><td class="hot">Merge-on-read, scales with unmerged parts</td></tr>
+      <tr><td>GROUP BY + argMax</td><td class="cool">Always correct</td><td>One scan, no merge triggered &mdash; every query pays it</td></tr>
+      <tr><td>Raw SELECT, no dedup</td><td class="hot">Correct only after the next merge</td><td class="cool">Cheapest &mdash; reads exactly what's on disk</td></tr>
+    </table>
+    <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)" data-copy="SELECT id, argMax(status, _version) AS status\nFROM orders\nGROUP BY id\nHAVING argMax(is_deleted, _version) = 0;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">the argMax pattern</span></div>
+      <div class="code-body"><span class="r">SELECT</span> id, argMax(status, _version) <span class="r">AS</span> status
+<span class="r">FROM</span> orders
+<span class="r">GROUP BY</span> id
+<span class="r">HAVING</span> argMax(is_deleted, _version) = <span class="g">0</span>;</div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">The same shape as every tradeoff this course has measured: Spark's trigger interval, Flink's watermark bound, and now FINAL. Correctness and latency trade against each other. You choose by SLA &mdash; you don't get the default for free.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 44 · THE ESCAPE HATCHES THAT DO EXIST ──────────── -->
+<section class="slide" id="s44" data-speaker="Correct an overstatement from Part two: picking ORDER BY once, no do-over, is still true for the base table's physical layout. But skip indices and projections give you a second access path without a second manually-maintained table. Be precise about the boundary: they accelerate, they don't relayout, and a projection is a second copy of the data with its own storage and write cost.">
+  <div class="slide-content" style="max-width:min(92vw,1020px);margin:0 auto;">
+    <div class="section-marker reveal">correction</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The escape hatches that <em>do</em> exist.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Two hours ago: pick <span class="term">ORDER BY</span> once, no later fix. Still true for the base table. But two tools add a secondary access path without rewriting it.</p>
+    <div class="two-col reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">Skip indices</p>
+        <ul class="bullets" style="margin-top:0.4rem">
+          <li><span class="ink-mono">minmax</span> &mdash; per-granule min/max, prunes numeric ranges</li>
+          <li><span class="ink-mono">set(N)</span> &mdash; per-granule distinct values, prunes equality</li>
+          <li><span class="ink-mono">bloom_filter</span> &mdash; probabilistic membership, high cardinality</li>
+        </ul>
+        <p class="sub" style="max-width:none;margin-top:0.5rem"><span class="ink-mono">ALTER TABLE events ADD INDEX idx_amount amount TYPE minmax GRANULARITY 4;</span></p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">Projections</p>
+        <ul class="bullets hot" style="margin-top:0.4rem">
+          <li>A second sort order, stored and kept in sync <em class="hot">for you</em></li>
+          <li>ClickHouse picks base table or projection per query</li>
+          <li>This is <span class="ink-mono">events_by_user_demo</span> from two slides ago, automated</li>
+        </ul>
+        <p class="sub" style="max-width:none;margin-top:0.5rem"><span class="ink-mono">ALTER TABLE events ADD PROJECTION by_user (SELECT * ORDER BY user_id);</span></p>
+      </div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>What neither does:</strong> change the base table's physical layout, or turn a wrong <span class="term">ORDER BY</span> into a right one for your dominant query. A projection is a full second copy of the data &mdash; it costs storage, and every insert now writes it twice.</div>
+    </div>
+    <table class="dtable reveal spoiler" style="margin-top:clamp(0.6rem,1.3vh,1rem)">
+      <tr><th>Query: filter by user_id</th><th class="num">Granules scanned</th></tr>
+      <tr><td>events, base table only</td><td class="num hot">2 446</td></tr>
+      <tr><td>events, projection present</td><td class="num cool">2</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─── 45 · TTL AND RETENTION ─────────────────────────── -->
+<section class="slide" id="s45" data-speaker="Short and practical. A real-time table with no TTL grows forever. Show the basic DELETE TTL and the tiered-storage move-to-cheaper-disk pattern, then move on -- this is a one-slide housekeeping item, not a deep dive.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">housekeeping</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">A table with no TTL fills the disk.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Kafka retains by time and rolls old segments off automatically. <span class="ink-mono">events</span> does not, unless you tell it to.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)" data-copy="ALTER TABLE events\nMODIFY TTL event_time + INTERVAL 7 DAY TO VOLUME 'cold',\n            event_time + INTERVAL 30 DAY DELETE;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">ClickHouse</span></div>
+      <div class="code-body"><span class="r">ALTER TABLE</span> events
+<span class="r">MODIFY TTL</span> event_time + <span class="r">INTERVAL</span> 7 <span class="r">DAY</span> <span class="r">TO VOLUME</span> <span class="s">'cold'</span>,
+            event_time + <span class="r">INTERVAL</span> 30 <span class="r">DAY</span> <span class="r">DELETE</span>;</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">TTL is enforced during <strong>background merges</strong>, the same schedule that compacts parts &mdash; it is lazy, not instant. Tiered storage needs a second volume configured in advance; this moves parts to it, then drops them, with no second table to maintain.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 46 · DID I NEED FLINK? ──────────────────────────── -->
+<section class="slide" id="s46" data-speaker="The most interesting slide in this part. A materialized view really is stream processing inside the database -- it triggers on insert, maintains incremental state, exactly the shape of Lessons 7-9. Be precise and honest about the boundary: no watermarks, no lateness handling, no stateful joins with TTL, no arbitrary per-key logic, no exactly-once across external sinks. It sees one insert block and has no concept of event-time progress. Land the rule: MV for a rollup already shaped like the data landing in the table, a stream processor when correctness depends on time.">
+  <div class="slide-content" style="max-width:min(92vw,1020px);margin:0 auto;">
+    <div class="section-marker reveal">landscape</div>
+    <p class="big-q reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Did I need <em>Flink</em>?</p>
+    <p class="sub reveal" style="margin-top:0.5rem;max-width:720px">The <span class="ink-mono">revenue_by_region_minute_mv</span> you built earlier today triggers on every insert and maintains incremental aggregate state. That is stream processing. So what did Lessons 7-9 buy you?</p>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <tr><th>Capability</th><th>ClickHouse MV</th><th>Spark / Flink</th></tr>
+      <tr><td>Triggers on</td><td>One insert block</td><td class="cool">Micro-batch trigger or continuous operator</td></tr>
+      <tr><td>Watermarks, late data</td><td class="hot">None</td><td class="cool">Configurable lateness, drop or hold</td></tr>
+      <tr><td>Stateful joins with TTL</td><td class="hot">None</td><td class="cool">Keyed state, TTL-managed</td></tr>
+      <tr><td>Per-key state machines</td><td class="hot">SQL only</td><td class="cool">Arbitrary code (ProcessFunction, mapGroupsWithState)</td></tr>
+      <tr><td>Exactly-once, external sinks</td><td class="hot">Best-effort</td><td class="cool">Checkpointed, transactional</td></tr>
+    </table>
+    <div class="callout proof reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">Reach for an MV when the aggregation is a rollup over data already landing in the table. Reach for a stream processor when correctness depends on event time &mdash; lateness, ordering, or state that outlives one insert block.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 47 · CLICKHOUSE vs DUCKDB vs POSTGRES ──────────── -->
+<section class="slide" id="s47" data-speaker="Extend the Hour 3 synthesis with the column everyone will ask about: why not just Postgres? Be honest -- it wins on transactions, point lookups, and not having to learn new infrastructure. It loses on exactly the Lesson 1 hot-row story, now spread across a GROUP BY instead of a single row.">
+  <div class="slide-content" style="max-width:min(92vw,1120px);margin:0 auto;">
+    <div class="section-marker reveal">synthesis</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Postgres <em>vs.</em> DuckDB <em>vs.</em> ClickHouse</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <tr><th>Dimension</th><th>Postgres</th><th>DuckDB (batch)</th><th>ClickHouse (real-time)</th></tr>
+      <tr><td>Data freshness</td><td class="cool">Instant &mdash; it's the source, no pipeline lag</td><td>Minutes (export interval)</td><td class="cool">Seconds (Kafka &rarr; MergeTree)</td></tr>
+      <tr><td>Query latency (small range)</td><td class="cool">Sub-ms with the right B-tree index</td><td class="cool">Sub-ms (in-process)</td><td>Low ms (network + query)</td></tr>
+      <tr><td>Concurrent ingest + query</td><td class="hot">OLTP-strong; an analytical scan competes with writes for buffer cache</td><td>Not designed</td><td class="cool">First-class</td></tr>
+      <tr><td>Operational complexity</td><td class="cool">Lowest &mdash; already in your stack</td><td class="cool">Zero (embedded)</td><td>Medium (server, Kafka, tuning)</td></tr>
+      <tr><td>When to choose</td><td>Transactional writes, point lookups, or no new infra at all</td><td>Ad-hoc, notebooks, CI tests</td><td class="cool">Live dashboards, user-facing analytics</td></tr>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">The Postgres loss is the <strong>Lesson 1 hot row</strong>, wearing a different costume: a high-cardinality <span class="ink-mono">GROUP BY</span> touches the full row tuple on every matching page &mdash; the same read amplification, just spread across millions of rows instead of one. Measure your own DuckDB column with <span class="ink-mono">src/compare_duckdb.py</span>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 48 · THE LATENCY BUDGET ─────────────────────────── -->
+<section class="slide" id="s48" data-speaker="The capstone slide of the entire course -- give this real care, it's the one they photograph. Every hop a fact travels from a Postgres commit to a browser paint, each one annotated with the lesson that taught it. The point is not the exact numbers, it's that end-to-end latency is a SUM, every term in that sum has now been measured by hand at least once, and real-time was never a property you bought off a vendor page -- it's a budget you allocate, term by term. Let this one land before moving on.">
+  <div class="slide-content" style="max-width:min(92vw,1080px);margin:0 auto;">
+    <div class="section-marker reveal">capstone</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">The latency budget.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem">One fact, every hop it travels from commit to pixel. Ten lessons, one number each.</p>
+    <div class="arch reveal" style="margin-top:clamp(0.6rem,1.3vh,1rem)">&#9312; Postgres commit                                  L1
+      ____   &larr; fill from your L1 run (load_async.py)
+&#9313; WAL &rarr; replication slot (logical decode)           L5
+      ____   &larr; fill from your L5 run (watch_lag.py)
+&#9314; CDC event &rarr; Kafka topic                           L6
+      ____   &larr; fill from your L6 run (watch_lag.py)
+      &#8618; optional detour: Kafka &rarr; Spark/Flink job     L7-9
+         ____   &larr; fill from your L9 run (analyze_latency.py)
+&#9315; Kafka &rarr; ClickHouse Kafka engine &rarr; MergeTree part   L10
+      0.05s  (p95 1.06s &mdash; measure_freshness.py)
+&#9316; materialized view updates, same insert block       L10
+      no extra hop &mdash; the MV rides the flush
+&#9317; dashboard query returns                            L10
+      7.3 ms (p99 63.5 ms &mdash; query_loadtest.py)
+&#9318; browser paint                        &mdash; not in this course</div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.6rem,1.3vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">End-to-end latency is the <strong>sum</strong> of every hop above, and you've now measured every term you can reach. &ldquo;Real-time&rdquo; was never a property you bought &mdash; it's a budget you allocate, term by term.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 49 · CAVEATS ───────────────────────────────────── -->
+<section class="slide" id="s49" data-speaker="The same honesty-slide convention from Lesson 9. Be explicit about what a single laptop cannot prove. The mechanism is real; the exact digits will move at scale.">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">honesty</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">What these numbers <em class="hot">don't</em> prove.</h2>
+    <ul class="bullets hot reveal" style="margin-top:clamp(0.6rem,1.3vh,1rem)">
+      <li><strong>One machine:</strong> ClickHouse, Kafka, and the producer share a laptop's CPU and disk &mdash; no network hop between them.</li>
+      <li><strong>One node:</strong> no replication, no failover. ReplicatedMergeTree and its coordination story went untested.</li>
+      <li><strong>Synthetic, uniform load:</strong> a steady producer rate, no traffic bursts, no skewed keys, no dead partitions.</li>
+      <li><strong>Warm cache, one concurrency level:</strong> queries hit data already in page cache; ten clients is not peak traffic.</li>
+      <li><strong>Tiny by ClickHouse standards:</strong> thousands to low millions of rows. Skip indices and projections earn their keep at billions.</li>
+    </ul>
+    <div class="callout proof reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">The <strong>mechanism</strong> holds: at-least-once, merge-time dedup, ORDER BY as primary index, FINAL's cost. The exact milliseconds will move, by a lot, at production scale and concurrency.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 50 · TAKE-HOME ─────────────────────────────────── -->
+<section class="slide" id="s50" data-speaker="Final take-home of the course. Frame it plainly: a dashboard is not done because it renders a number, it's done because you can defend that number's freshness with a measurement. Walk through what the grader runs and what actually earns credit -- evidence and a defended tradeoff, not a working demo.">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">Take-home</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Ship a dashboard you can <em>defend</em>.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem;max-width:740px">A live revenue dashboard over Kafka &rarr; ClickHouse, where every freshness and latency claim in your README is a number you measured, not one you assumed.</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.3vh,1rem);max-width:780px">
+      <li><strong>Ingestion latency distribution</strong> &mdash; <span class="ink-mono">measure_freshness.py</span>, and how it shifted when you swept <span class="ink-mono">kafka_max_block_size</span>.</li>
+      <li><strong>Query latency under load</strong> &mdash; p50/p95/p99 from <span class="ink-mono">query_loadtest.py</span> while the producer keeps writing.</li>
+      <li><strong>The ORDER BY experiment</strong> &mdash; granules scanned on two sort orders for the same filter, and the timing difference.</li>
+      <li><strong>ClickHouse vs. DuckDB, your numbers</strong> &mdash; <span class="ink-mono">compare_duckdb.py</span>'s export and query timings, and when each wins for this workload.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>Deliverable standard:</strong> the grader stands up your stack, re-runs your sweeps, and checks your README's numbers against its own. A working demo alone earns nothing &mdash; measured evidence and a defended tradeoff do. Repo + README + AGENTS.md/CLAUDE.md, via PR.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 51 · COURSE CLOSE ───────────────────────────────── -->
+<section class="slide deep" id="s51" data-speaker="The last slide of the last lesson. Land the whole arc in one breath: a row became a WAL record, became a CDC event, became a Kafka message, became windowed state, became a measured latency distribution, became a column in an OLAP engine, became a number on a dashboard. The thesis: every one of those transformations costs money, latency, and operational burden, and the skill this course taught is measuring whether you need it. Let it sit -- don't rush off this slide.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,880px);margin:0 auto;align-items:center;text-align:center;justify-content:center;">
+    <div class="kicker reveal">Lesson 10 &middot; course close</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem);font-size:clamp(2rem,5.5vw,4rem)">Ten lessons, <em>one row.</em></h1>
+    <p class="lede reveal" style="margin-top:clamp(0.9rem,2vh,1.4rem);max-width:680px;margin-left:auto;margin-right:auto;">A row in Postgres became a WAL record, became a CDC event, became a Kafka message, became windowed state, became a measured latency distribution, became a column in an OLAP engine, became a number on a dashboard.</p>
+    <p class="sub reveal" style="margin-top:clamp(0.9rem,2vh,1.4rem);max-width:640px;margin-left:auto;margin-right:auto;">Every one of those transformations costs money, latency, and operational burden. Nothing in this course was free, and nothing was mandatory. The skill was never the tools. It was measuring whether you needed them.</p>
+  </div>
+</section>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const bar=document.getElementById('progressBar');
+const io=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      const i=slides.indexOf(e.target);
+      bar.style.width=((i+1)/slides.length*100)+'%';
+    }
+  });
+},{threshold:0.5});
+slides.forEach(s=>io.observe(s));
+
+function go(n){const i=Math.max(0,Math.min(slides.length-1,n));slides[i].scrollIntoView({behavior:'smooth'});}
+function current(){
+  let best=0,bestTop=Infinity;
+  slides.forEach((s,i)=>{const t=Math.abs(s.getBoundingClientRect().top);if(t<bestTop){bestTop=t;best=i;}});
+  return best;
+}
+window.addEventListener('keydown',(e)=>{
+  if(['ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();go(current()+1);}
+  else if(['ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(current()-1);}
+  else if(e.key==='Home'){e.preventDefault();go(0);}
+  else if(e.key==='End'){e.preventDefault();go(slides.length-1);}
+  else if(e.key==='r'||e.key==='R'){slides[current()].querySelectorAll('.spoiler').forEach(s=>s.classList.add('revealed'));}
+});
+document.querySelectorAll('.spoiler').forEach(s=>s.addEventListener('click',()=>s.classList.add('revealed')));
+
+// copy buttons for prompts and code blocks
+document.querySelectorAll('[data-copy]').forEach(block => {
+  const header = block.querySelector('.code-header, .plabel');
+  if (!header) return;
+  const btn = document.createElement('button');
+  btn.className = 'code-copy';
+  btn.type = 'button';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(block.getAttribute('data-copy') || '').then(() => {
+      btn.textContent = 'copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500);
+    }).catch(() => { btn.textContent = 'failed'; setTimeout(() => btn.textContent = 'copy', 1500); });
+  });
+  header.appendChild(btn);
+});
+</script>
+</body>
+</html>

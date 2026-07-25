@@ -1,0 +1,71 @@
+# Lesson 10 — Real-time OLAP: ClickHouse + Kafka + FastAPI
+#
+# Brings up a single-node Kafka (KRaft) and a single ClickHouse server.
+# FastAPI runs on the host via uv so students can iterate quickly.
+#
+#   docker compose up -d
+#   uv run python src/setup_topics.py --reset
+#   uv run python src/setup_clickhouse.py
+#   uv run python src/producer.py --rate 1000
+#   uv run uvicorn src.app:app --reload
+#
+# If you still have the Lesson 9 broker running on port 19092, stop it first
+# (docker stop kafka-l9) to avoid a port conflict.
+
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: kafka-l10
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms256m
+      CLUSTER_ID: L10LessonKafkaCluster1
+    volumes:
+      - kafka-l10-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.12-alpine
+    container_name: clickhouse-l10
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: lesson10
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-l10-data:/var/lib/clickhouse
+      - ./config/clickhouse-kafka.xml:/etc/clickhouse-server/config.d/kafka.xml:ro
+      - ./sql/init_clickhouse.sql:/docker-entrypoint-initdb.d/init_clickhouse.sql:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+volumes:
+  kafka-l10-data:
+  clickhouse-l10-data:

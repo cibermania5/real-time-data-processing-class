@@ -11,7 +11,6 @@ Usage:
 import argparse
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -50,6 +49,7 @@ def drain_topic(topic: str, bootstrap: str, timeout: float = 5.0):
             continue
         try:
             records.append(json.loads(msg.value().decode("utf-8")))
+            print(f"  {topic}: {len(records)} result(s) collected so far")
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             print(f"warning: skipping malformed message: {e}", file=sys.stderr)
 
@@ -95,6 +95,24 @@ def summarize(name: str, processing: np.ndarray, end_to_end: np.ndarray) -> dict
             "max": round(float(np.max(end_to_end)), 2) if len(end_to_end) else None,
         },
     }
+
+
+def print_summary(report: dict):
+    """Print a human-readable latency summary to stdout."""
+    print("\nLatency summary")
+    for key in ("spark", "flink"):
+        entry = report[key]
+        print(f"\n{entry['engine']}  ({entry['windows']} windows)")
+        for metric in ("processing_latency_ms", "end_to_end_latency_ms"):
+            stats = entry[metric]
+            print(f"  {metric}:")
+            for stat in ("min", "p50", "p95", "p99", "max"):
+                val = stats[stat]
+                label = stat.rjust(4)
+                if val is None:
+                    print(f"    {label}: n/a")
+                else:
+                    print(f"    {label}: {val:.2f} ms")
 
 
 def plot_cdf(spark_proc, flink_proc, spark_e2e, flink_e2e, path: Path):
@@ -159,6 +177,7 @@ def main():
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     print(f"\nLatency report saved to {report_path}")
     print(json.dumps(report, indent=2))
+    print_summary(report)
 
     plot_path = output_dir / "latency_cdf.png"
     plot_cdf(spark_proc, flink_proc, spark_e2e, flink_e2e, plot_path)

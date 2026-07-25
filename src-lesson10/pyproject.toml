@@ -1,0 +1,30 @@
+[project]
+name = "lesson10-realtime-olap"
+version = "0.1.0"
+description = "Lesson 10: Real-time OLAP — ClickHouse ingests Kafka, FastAPI serves live aggregations."
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    "clickhouse-connect>=0.8.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "confluent-kafka>=2.6.0",
+    "httpx>=0.27.0",
+    "duckdb>=1.1.0",
+    "pandas>=2.2.0",
+    "pyarrow>=17.0.0",
+    "numpy>=1.26.0",
+    "matplotlib>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ty.environment]
+# Make the IDE/CLI ty type checker use the uv-managed .venv.
+python = ".venv"

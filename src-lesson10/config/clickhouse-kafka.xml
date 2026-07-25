@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+  librdkafka properties for the Kafka table engine.
+
+  These are NOT table settings. A Kafka-engine CREATE TABLE accepts only
+  ClickHouse's own kafka_* settings (kafka_broker_list, kafka_max_block_size,
+  kafka_poll_timeout_ms and friends). Properties belonging to the underlying
+  librdkafka client, auto.offset.reset among them, are configured here and
+  apply to every Kafka-engine table on the server.
+
+  Putting kafka_auto_offset_reset in the table DDL fails with UNKNOWN_SETTING
+  and aborts the rest of the init script.
+
+  earliest, so a student who produces events before creating the tables still
+  sees data instead of an empty dashboard and no error.
+-->
+<clickhouse>
+    <kafka>
+        <auto_offset_reset>earliest</auto_offset_reset>
+    </kafka>
+</clickhouse>
