@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 7 — Procesamiento de flujos I — Cómputo en vuelo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LESSON 7 — "TELEMETRY" DESIGN SYSTEM  (new for L7–L9)
+   Dark instrument panel: deep slate + faint blueprint grid.
+   Space Grotesk (display) + IBM Plex Mono.
+   TWO signals, because the lesson is about time:
+     cyan  = in-time, flow, structure
+     ember = late, dropped, danger
+   Key terms = mono cyan with corner brackets ⌜term⌝.
+   ============================================================ */
+:root{
+  --bg:#0c1014; --bg2:#10161d; --panel:#151c25; --panel2:#1a222d;
+  --text:#e7eaee; --soft:#aab4bf; --muted:#67737f;
+  --line:#222c37; --line-strong:#324050;
+  --cyan:#5cd6e8; --cyan-soft:rgba(92,214,232,0.10); --cyan-dim:rgba(92,214,232,0.22);
+  --ember:#ff6e54; --ember-soft:rgba(255,110,84,0.10); --ember-dim:rgba(255,110,84,0.25);
+  --grid:rgba(92,214,232,0.045);
+  --code-bg:#0a0e12;
+  --sans:'Space Grotesk',-apple-system,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --dur:0.7s; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* ---- slide shell: every slide carries the faint grid ---- */
+.slide{
+  width:100vw;height:100vh;height:100dvh;overflow:hidden;position:relative;scroll-snap-align:start;
+  display:flex;flex-direction:column;padding:clamp(1.3rem,3.5vw,3.3rem) clamp(1.4rem,5vw,4.5rem);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;min-height:0;overflow:hidden}
+.slide.deep{background-color:#080b0e}
+
+/* ---- nav: slash breadcrumb (course progress) ---- */
+.crumbs{display:flex;flex-wrap:wrap;font-family:var(--mono);font-size:clamp(0.55rem,0.92vw,0.7rem);color:var(--muted);letter-spacing:0.03em}
+.crumb{padding-right:0.8em;margin-right:0.8em;border-right:1px solid var(--line-strong)}
+.crumb:last-child{border-right:0;margin-right:0;padding-right:0}
+.crumb.on{color:var(--text);font-weight:700;position:relative}
+.crumb.on::after{content:'';position:absolute;left:0;right:0.8em;bottom:-0.45em;height:2px;background:var(--cyan)}
+
+/* ---- type ---- */
+.kicker{font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.74rem);letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:clamp(0.58rem,0.95vw,0.72rem);letter-spacing:0.12em;text-transform:uppercase;color:var(--cyan)}
+.section-marker{display:inline-flex;align-items:center;gap:0.4rem;font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);
+  font-weight:700;text-transform:uppercase;letter-spacing:0.12em;padding-bottom:0.35rem;border-bottom:2px solid var(--cyan);color:var(--cyan);align-self:flex-start}
+.section-marker.hot{border-color:var(--ember);color:var(--ember)}
+h1{font-family:var(--sans);font-weight:700;line-height:0.98;letter-spacing:-0.025em;font-size:clamp(2.5rem,7.5vw,5.6rem);color:var(--text)}
+h2{font-family:var(--sans);font-weight:600;line-height:1.05;letter-spacing:-0.015em;font-size:clamp(1.55rem,4.2vw,2.9rem);color:var(--text)}
+h2 em,h1 em{font-style:normal;font-weight:600;color:var(--cyan)}
+h2 em.hot,h1 em.hot{color:var(--ember)}
+.sub{font-family:var(--sans);font-weight:400;font-size:clamp(0.84rem,1.5vw,1.08rem);color:var(--soft);max-width:640px;line-height:1.6}
+.lede{font-family:var(--sans);font-weight:500;font-size:clamp(0.95rem,1.8vw,1.3rem);color:var(--text);line-height:1.4}
+.label{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted)}
+
+/* ---- signature: key term = mono cyan with corner brackets ---- */
+.term{font-family:var(--mono);font-size:0.84em;color:var(--cyan);white-space:nowrap;padding:0 0.1em}
+.term::before{content:'\231C';margin-right:0.06em;opacity:0.7}
+.term::after{content:'\231D';margin-left:0.06em;opacity:0.7}
+.term.hot{color:var(--ember)}
+.hl{background:var(--cyan-soft);color:var(--cyan);padding:0.04em 0.32em;border-radius:2px;font-weight:600}
+.ink-mono{font-family:var(--mono);font-size:0.88em;background:rgba(92,214,232,0.08);padding:0.05em 0.35em;border-radius:3px;color:#cfe9ee}
+
+/* ---- bullets ---- */
+.bullets{list-style:none;display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.5rem)}
+.bullets li{font-family:var(--sans);font-size:clamp(0.74rem,1.25vw,0.94rem);color:var(--text);line-height:1.45;padding-left:1.35em;text-indent:-1.35em}
+.bullets li::before{content:'\25B8';color:var(--cyan);font-weight:700;margin-right:0.55em}
+.bullets.hot li::before{color:var(--ember)}
+.bullets li strong{font-weight:600}
+
+/* ---- two column ---- */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);flex:1;min-height:0}
+@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.55rem);min-height:0}
+.col-label{font-family:var(--mono);font-size:clamp(0.55rem,0.85vw,0.68rem);font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
+
+/* ---- big question ---- */
+.big-q{font-family:var(--sans);font-weight:600;font-size:clamp(1.6rem,4.4vw,3.2rem);line-height:1.12;letter-spacing:-0.02em;color:var(--text);max-width:22ch}
+
+/* ---- callout ---- */
+.callout{display:flex;gap:clamp(0.4rem,0.9vw,0.65rem);padding:clamp(0.4rem,0.9vh,0.7rem) clamp(0.6rem,1.2vw,1rem);
+  border-radius:5px;border-left:3px solid;flex-shrink:0;background:var(--panel)}
+.callout .ico{flex-shrink:0;width:clamp(0.95rem,1.4vw,1.15rem);height:clamp(0.95rem,1.4vw,1.15rem);margin-top:0.05em}
+.callout .ctxt{font-family:var(--sans);font-size:clamp(0.66rem,1.1vw,0.85rem);line-height:1.5;color:var(--soft)}
+.callout .ctxt strong{color:var(--text)}
+.callout.note{border-color:var(--line-strong)}
+.callout.danger{background:var(--ember-soft);border-color:var(--ember)}
+.callout.proof{background:var(--cyan-soft);border-color:var(--cyan)}
+
+/* ---- opencode AI prompt ---- */
+.prompt{background:var(--code-bg);border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:5px;padding:clamp(0.42rem,0.95vh,0.68rem) clamp(0.7rem,1.4vw,1.05rem)}
+.prompt .plabel{display:block;font-family:var(--mono);font-size:clamp(0.48rem,0.75vw,0.6rem);font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.3rem}
+.prompt .pcmd{display:block;font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.78rem);color:#c4ccd4;line-height:1.7}
+.prompt .pcmd::before{content:'\276F  ';color:var(--cyan);font-weight:700}
+
+/* ---- code ---- */
+.code-block{background:var(--code-bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;min-height:0}
+.code-header{display:flex;align-items:center;gap:5px;padding:clamp(0.28rem,0.5vh,0.4rem) clamp(0.5rem,1vw,0.8rem);
+  background:rgba(92,214,232,0.05);border-bottom:1px solid var(--line)}
+.code-dot{width:7px;height:7px;border-radius:50%;background:var(--line-strong)}
+.code-label{margin-left:auto;font-family:var(--mono);font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.code-body{padding:clamp(0.5rem,1vh,0.85rem) clamp(0.7rem,1.3vw,1.1rem);font-family:var(--mono);
+  font-size:clamp(0.55rem,0.92vw,0.72rem);line-height:1.62;color:#c4ccd4;white-space:pre;overflow:hidden;text-align:left}
+.k{color:#7fb4e8}.s{color:#d8b478}.fn{color:#e7eaee}.v{color:#9fb6c9}
+.g{color:#d8b478}.n{color:#7fd6a4}.r{color:#ff6e54;font-weight:700}.cm{color:#5b6672;font-style:italic}
+.cy{color:#5cd6e8}
+
+/* ---- ascii architecture ---- */
+.arch{font-family:var(--mono);font-size:clamp(0.5rem,0.85vw,0.68rem);color:var(--soft);line-height:1.5;white-space:pre;
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(0.9rem,1.6vw,1.3rem);overflow:hidden}
+
+/* ---- table ---- */
+.dtable{width:100%;border-collapse:collapse}
+.dtable th,.dtable td{font-family:var(--sans);font-size:clamp(0.62rem,1.05vw,0.84rem);
+  padding:clamp(0.22rem,0.5vh,0.42rem) clamp(0.4rem,0.9vw,0.75rem);text-align:left;border-bottom:1px solid var(--line)}
+.dtable th{font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.dtable td.num,.dtable th.num{font-family:var(--mono);text-align:right}
+.dtable tr:last-child td{border-bottom:0}
+.dtable .hot{color:var(--ember);font-weight:600}
+.dtable .cool{color:var(--cyan);font-weight:600}
+
+/* ---- big stat ---- */
+.stat{font-family:var(--mono);font-weight:700;font-size:clamp(1.5rem,3.6vw,2.7rem);line-height:1;color:var(--text)}
+.stat.cool{color:var(--cyan)}.stat.red{color:var(--ember)}
+.stat-label{font-family:var(--mono);font-size:clamp(0.55rem,0.85vw,0.68rem);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em}
+
+/* ---- timeline (signature visual: events vs the watermark) ---- */
+.tline{position:relative;height:clamp(64px,11vh,96px);max-width:760px;margin-top:clamp(0.8rem,2vh,1.4rem)}
+.tline .rail{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--line-strong)}
+.tline .rail::after{content:'';position:absolute;right:-1px;top:50%;transform:translateY(-50%);
+  border-left:8px solid var(--line-strong);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.tline .wm{position:absolute;top:6%;bottom:6%;left:62%;width:2px;background:var(--ember)}
+.tline .wm::before{content:'marca de agua';position:absolute;top:-2%;left:0.6em;font-family:var(--mono);
+  font-size:clamp(0.5rem,0.8vw,0.64rem);color:var(--ember);letter-spacing:0.06em;white-space:nowrap}
+.tline .dot{position:absolute;top:50%;width:clamp(10px,1.3vw,14px);height:clamp(10px,1.3vw,14px);border-radius:50%;
+  background:var(--cyan);transform:translate(-50%,-50%);animation:tlFlow 7s linear infinite;opacity:0}
+.tline .dot.late{background:var(--ember);animation:tlLate 7s linear infinite}
+.tline .cap{position:absolute;bottom:-1.6em;left:0;font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.68rem);color:var(--muted);letter-spacing:0.04em}
+@keyframes tlFlow{
+  0%{left:0;opacity:0}6%{opacity:1}90%{opacity:1}100%{left:100%;opacity:0}
+}
+@keyframes tlLate{
+  0%{left:0;opacity:0;transform:translate(-50%,-50%)}6%{opacity:1}
+  58%{left:60%;opacity:1;transform:translate(-50%,-50%)}
+  74%{left:63%;opacity:.7;transform:translate(-50%,180%) scale(.8)}
+  82%,100%{left:64%;opacity:0;transform:translate(-50%,420%) scale(.5)}
+}
+
+/* ---- footer meta ---- */
+.meta{display:flex;justify-content:space-between;align-items:center;gap:1rem;font-family:var(--mono);
+  font-size:clamp(0.5rem,0.82vw,0.64rem);color:var(--muted);letter-spacing:0.03em}
+.meta span:nth-child(2){text-align:right;opacity:0.8}
+hr.rule{border:0;border-top:1px solid var(--line);margin:0}
+
+/* ---- reveal animation ---- */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.slide.visible .reveal{opacity:1;transform:none}
+.slide.visible .reveal:nth-child(1){transition-delay:.05s}
+.slide.visible .reveal:nth-child(2){transition-delay:.12s}
+.slide.visible .reveal:nth-child(3){transition-delay:.19s}
+.slide.visible .reveal:nth-child(4){transition-delay:.26s}
+.slide.visible .reveal:nth-child(5){transition-delay:.33s}
+.slide.visible .reveal:nth-child(6){transition-delay:.40s}
+.slide.visible .reveal:nth-child(7){transition-delay:.47s}
+
+/* ---- chrome ---- */
+.progress-bar{position:fixed;bottom:0;left:0;height:2px;background:var(--cyan);z-index:200;width:0;transition:width .35s ease}
+.kbd-hint{position:fixed;bottom:clamp(0.5rem,1.2vh,0.9rem);left:50%;transform:translateX(-50%);font-family:var(--mono);
+  font-size:clamp(0.42rem,0.65vw,0.52rem);color:var(--muted);opacity:0.5;z-index:200}
+@media(max-height:600px){.kbd-hint{display:none}}
+@media (prefers-reduced-motion:reduce){.reveal{transition-duration:.2s}html{scroll-behavior:auto}}
+
+/* ---- spoiler: demo results stay blurred until the room predicts ---- */
+.spoiler{position:relative;cursor:pointer}
+.spoiler>*{filter:blur(9px);transition:filter .5s var(--ease)}
+.spoiler::after{content:'predice primero \00b7 clic o presiona R';position:absolute;inset:0;z-index:2;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-size:clamp(0.6rem,1vw,0.78rem);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--cyan)}
+.spoiler.revealed>*{filter:none}
+.spoiler.revealed::after{display:none}
+
+/* ---- title (slide 1) opening animation ---- */
+@keyframes titleRise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes drawUnderline{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+#s1 .reveal{opacity:0;animation:titleRise .85s var(--ease) forwards}
+#s1 .crumbs.reveal{animation-delay:.05s}
+#s1 .eyebrow.reveal{animation-delay:.25s}
+#s1 h1.reveal{animation-delay:.4s}
+#s1 .sub.reveal{animation-delay:.7s}
+#s1 .tline.reveal{animation-delay:1.05s}
+#s1 .t-data{position:relative;white-space:nowrap}
+#s1 .t-data::after{content:'';position:absolute;left:0;right:-.04em;bottom:.04em;height:.085em;background:var(--cyan);transform:scaleX(0);transform-origin:left;animation:drawUnderline .7s var(--ease) 1.2s forwards}
+@media (prefers-reduced-motion:reduce){
+  #s1 .reveal,.tline .dot,#s1 .t-data::after{animation:none}
+  #s1 .reveal{opacity:1;transform:none}#s1 .t-data::after{transform:scaleX(1)}
+  .tline .dot{opacity:1;left:40%}.tline .dot.late{left:70%;transform:translate(-50%,180%) scale(.8);opacity:.6}
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<span class="kbd-hint">&uarr; &darr; navegar &middot; R revelar</span>
+
+<!-- ════════════════════════════════════════════════════════════
+     LESSON 7 · STREAM PROCESSING I · "COMPUTE IN FLIGHT"
+     ════════════════════════════════════════════════════════════ -->
+
+<!-- ─── 01 · TITLE ─────────────────────────────────────── -->
+<section class="slide visible deep" id="s1">
+  <div class="crumbs reveal">
+    <span class="crumb">06 Kafka</span>
+    <span class="crumb on">07 Ventanas</span>
+    <span class="crumb">08 Estado</span>
+    <span class="crumb">09 Flink</span>
+  </div>
+  <div class="slide-content">
+    <div class="eyebrow reveal" style="margin-bottom:0.8rem;">Procesamiento de flujos I &middot; ventanas y marcas de agua</div>
+    <h1 class="reveal">Cómputo en <span class="t-data">vuelo</span>.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.9rem,2vh,1.4rem);">CDC capturó los cambios. Kafka los transporta. Pero una tubería no responde preguntas: <em style="color:var(--cyan);font-style:normal;">&ldquo;ingresos en los últimos cinco minutos&rdquo;</em> significa agregar una tabla que nunca termina. Hoy: ventanas, tiempo de evento y la marca de agua, la línea que decide qué eventos cuentan y cuáles caen por el borde.</p>
+    <div class="tline reveal">
+      <div class="rail"></div>
+      <div class="wm"></div>
+      <span class="dot" style="animation-delay:0s"></span>
+      <span class="dot" style="animation-delay:-1.7s"></span>
+      <span class="dot" style="animation-delay:-3.4s"></span>
+      <span class="dot" style="animation-delay:-5.1s"></span>
+      <span class="dot late" style="animation-delay:-0.9s"></span>
+      <span class="dot late" style="animation-delay:-4.3s"></span>
+      <span class="cap">eventos a tiempo pasan &middot; eventos tardíos caen en la línea</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>PROCESAMIENTO DE DATOS EN TIEMPO REAL</span><span>PySpark Structured Streaming &middot; Kafka &middot; tiempo de evento</span></div>
+</section>
+
+<!-- ─── 02 · RECAP L6 → THE BRIDGE ─────────────────────── -->
+<section class="slide" id="s2">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Resumen &middot; lección 6</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Los datos fluyen. Nadie est&aacute; <em>calculando.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;">Kafka mantiene el flujo ordenado y reproducible, y t&uacute; escribiste el bucle de polling que lo lee. Pero un consumidor que imprime mensajes no es anal&iacute;tica. Hazle una pregunta real y la brecha queda al descubierto:</p>
+    <div class="reveal" style="display:flex;gap:clamp(1.2rem,4vw,3rem);flex-wrap:wrap;margin-top:clamp(0.7rem,1.8vh,1.2rem);">
+      <div><div class="stat cool">&infin;</div><div class="stat-label">eventos retenidos, reproducibles</div></div>
+      <div><div class="stat red">0</div><div class="stat-label">agregaciones calculadas</div></div>
+      <div><div class="stat">?</div><div class="stat-label">&ldquo;ingresos, &uacute;ltimos 5 minutos&rdquo;</div></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+      <span class="ctxt"><strong>Kafka es una tuber&iacute;a, no una calculadora.</strong> Algo tiene que consumir, transformar y agregar, continuamente, sin pausar el flujo. Ese algo es un procesador de flujos. Y la semana pasada te dije que nunca m&aacute;s escribir&iacute;as un bucle de polling: hoy Spark lo escribe por ti.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>EL PUENTE</span><span>transporte &rarr; c&oacute;mputo</span></div>
+</section>
+
+<!-- ─── 03 · THE TOPOLOGY ──────────────────────────────── -->
+<section class="slide" id="s3">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; la forma universal</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Fuente &rarr; operadores &rarr; sumidero.</h2>
+    <div class="arch reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem);padding:clamp(0.9rem,2vh,1.5rem) clamp(0.9rem,1.6vw,1.4rem);">
+<svg viewBox="0 0 980 196" style="width:100%;height:auto;display:block;font-family:'Space Grotesk',sans-serif" role="img" aria-label="Topolog&iacute;a de flujo: fuente, luego parseo y filtrado sin estado, luego una agregaci&oacute;n con ventanas con estado, y finalmente el sumidero">
+  <defs>
+    <marker id="l7arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#5cd6e8"/>
+    </marker>
+  </defs>
+  <g stroke="#5cd6e8" stroke-width="2">
+    <line x1="158" y1="80" x2="186" y2="80" marker-end="url(#l7arrow)"/>
+    <line x1="316" y1="80" x2="334" y2="80" marker-end="url(#l7arrow)"/>
+    <line x1="464" y1="80" x2="482" y2="80" marker-end="url(#l7arrow)"/>
+    <line x1="726" y1="80" x2="754" y2="80" marker-end="url(#l7arrow)"/>
+  </g>
+  <rect x="6" y="48" width="152" height="64" rx="8" fill="#1a222d" stroke="#324050" stroke-width="1.5"/>
+  <text x="82" y="76" text-anchor="middle" fill="#e7eaee" font-size="15" font-weight="700">Kafka topic</text>
+  <text x="82" y="96" text-anchor="middle" fill="#67737f" font-size="10.5" letter-spacing="0.12em">FUENTE</text>
+  <rect x="192" y="48" width="124" height="64" rx="8" fill="#151c25" stroke="#5cd6e8" stroke-width="1.5"/>
+  <text x="254" y="85" text-anchor="middle" fill="#cfe9ee" font-size="15" font-weight="600">parse</text>
+  <rect x="340" y="48" width="124" height="64" rx="8" fill="#151c25" stroke="#5cd6e8" stroke-width="1.5"/>
+  <text x="402" y="85" text-anchor="middle" fill="#cfe9ee" font-size="15" font-weight="600">filter</text>
+  <rect x="488" y="48" width="238" height="64" rx="8" fill="rgba(255,110,84,0.09)" stroke="#ff6e54" stroke-width="1.5"/>
+  <text x="607" y="85" text-anchor="middle" fill="#ffd2c7" font-size="15" font-weight="600">window + aggregate</text>
+  <rect x="760" y="48" width="214" height="64" rx="8" fill="#1a222d" stroke="#324050" stroke-width="1.5"/>
+  <text x="867" y="76" text-anchor="middle" fill="#e7eaee" font-size="14" font-weight="700">console · Kafka · DB</text>
+  <text x="867" y="96" text-anchor="middle" fill="#67737f" font-size="10.5" letter-spacing="0.12em">SUMIDERO</text>
+  <path d="M192,126 L192,136 L464,136 L464,126" fill="none" stroke="#5cd6e8" stroke-width="1.5"/>
+  <text x="328" y="158" text-anchor="middle" fill="#5cd6e8" font-size="12.5" font-weight="700" letter-spacing="0.1em">SIN ESTADO</text>
+  <text x="328" y="176" text-anchor="middle" fill="#aab4bf" font-size="11.5">sin memoria entre eventos</text>
+  <path d="M488,126 L488,136 L726,136 L726,126" fill="none" stroke="#ff6e54" stroke-width="1.5"/>
+  <text x="607" y="158" text-anchor="middle" fill="#ff6e54" font-size="12.5" font-weight="700" letter-spacing="0.1em">CON ESTADO</text>
+  <text x="607" y="176" text-anchor="middle" fill="#aab4bf" font-size="11.5">recuerda a través de eventos · sobrevive a fallos &#8594; L8</text>
+</svg></div>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem);max-width:820px;">
+      <li><strong>Operadores sin estado</strong> (<span class="ink-mono">map</span>, <span class="ink-mono">filter</span>, <span class="ink-mono">flatMap</span>): la salida depende solo del evento actual. Trivialmente paralelos, trivialmente reiniciables. Los 20 minutos f&aacute;ciles de hoy.</li>
+      <li><strong>Operadores con estado</strong> (agregaciones, joins, sesiones): la salida depende de lo que vino antes. El estado debe sobrevivir a fallos &mdash; esa maquinaria es la <strong>Lecci&oacute;n 8</strong>. Hoy tocamos su caso m&aacute;s simple: la agregaci&oacute;n por ventanas.</li>
+      <li>La topolog&iacute;a es la misma en Spark, Flink y Kafka Streams. Las API difieren; <strong>este modelo mental se transfiere.</strong></li>
+    </ul>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>TOPOLOG&Iacute;A</span><span>un DAG sobre una entrada sin fin</span></div>
+</section>
+
+<!-- ─── 04 · WHY SPARK ─────────────────────────────────── -->
+<section class="slide" id="s4">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; la herramienta</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Spark, a prop&oacute;sito.</h2>
+    <ul class="bullets reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);max-width:800px;">
+      <li><strong>Lo encontrar&aacute;s en el trabajo.</strong> Structured Streaming es el procesador de flujos m&aacute;s desplegado en puestos de ingenier&iacute;a de datos, punto.</li>
+      <li><strong>Ya piensas en DataFrames</strong> (pandas, DuckDB). El salto conceptual es una frase: <em style="color:var(--cyan);font-style:normal;">procesamiento por lotes, pero la entrada nunca termina.</em></li>
+      <li><strong>El micro-lote hace visible el tiempo.</strong> Cada lote es un paso discreto que puedes observar &mdash; las ventanas se cierran, las marcas de agua avanzan, entre lotes. Un motor continuo oculta esto.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">El micro-lote tambi&eacute;n es un piso de latencia &mdash; y si ese piso importa es una pregunta medible, no una opini&oacute;n. Lo medimos en la <strong>Lecci&oacute;n 9</strong>, Spark vs Flink, con CDFs en mano. Hoy, el micro-lote es el instrumento de ense&ntilde;anza.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>LA HERRAMIENTA</span><span>PySpark Structured Streaming</span></div>
+</section>
+
+<!-- ─── 05 · THE PROGRAMMING MODEL ─────────────────────── -->
+<section class="slide" id="s5">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; el modelo</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Una palabra convierte la tabla en <em>infinita.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;">Un DataFrame de Spark es una tabla perezosa y distribuida: las transformaciones construyen un plan, nada se ejecuta hasta que algo lo dispara. La versi&oacute;n streaming difiere en cuatro letras:</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:740px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">read vs readStream</span></div>
+      <div class="code-body">spark.<span class="cy">read</span>.format(<span class="s">"kafka"</span>)...<span class="fn">load</span>()        <span class="cm"># finite — a snapshot, then done</span>
+spark.<span class="cy">readStream</span>.format(<span class="s">"kafka"</span>)...<span class="fn">load</span>()  <span class="cm"># infinite — keeps ingesting</span>
+
+<span class="cm"># both yield the same columns:</span>
+<span class="cm">#   key · value (binary!) · topic · partition · offset · timestamp</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+      <span class="ctxt">Casi todas las operaciones de DataFrame funcionan sin cambios en el de streaming. Las columnas son de Kafka &mdash; reconoces las seis de la semana pasada, y <span class="ink-mono">value</span> son bytes crudos que debes parsear, exactamente como tu <span class="ink-mono">json.loads</span> en el bucle de polling.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>EL MODELO</span><span>tabla perezosa, entrada ilimitada</span></div>
+</section>
+
+<!-- ─── 06 · THE MICRO-BATCH LOOP ──────────────────────── -->
+<section class="slide" id="s6">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; el motor</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Un bucle infinito de <em>trabajos por lotes.</em></h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:740px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">el bucle de micro-lotes, conceptualmente</span></div>
+      <div class="code-body"><span class="k">every</span> trigger interval (<span class="s">"5 seconds"</span>):
+    new_events = <span class="fn">poll</span>(kafka, since=last_offsets)   <span class="cm"># your L6 loop</span>
+    result     = <span class="fn">run_batch_query</span>(new_events)       <span class="cm"># plan → optimize → execute</span>
+    <span class="fn">write</span>(result, sink)
+    <span class="fn">save</span>(offsets + state, checkpoint_dir)          <span class="cm"># your commit, durably</span></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt"><strong>La tabla de mapeo de la semana pasada, respetada.</strong> El bucle de polling, los commits de offset, el reinicio tras fallo &mdash; todo sigue pasando, dentro del trigger. El directorio de <span class="term">checkpoint</span> juega el papel de <span class="ink-mono">__consumer_offsets</span>, y adem&aacute;s almacena estado. Interioriza este bucle y todo lo de hoy &mdash; ventanas, marcas de agua, modos de salida &mdash; es solo contabilidad a&ntilde;adida sobre &eacute;l.</span>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">El intervalo de trigger es un <strong>control de latencia</strong>: m&aacute;s corto = resultados m&aacute;s frescos, m&aacute;s largo = lotes m&aacute;s grandes que amortizan la sobrecarga de planificaci&oacute;n. Guarda esa idea, probaremos que no cambia la correcci&oacute;n.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>MICRO-LOTE</span><span>trigger &middot; proceso &middot; checkpoint</span></div>
+</section>
+
+<!-- ─── 07 · STATELESS TRANSFORMS ──────────────────────── -->
+<section class="slide" id="s7">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; la parte f&aacute;cil</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Sin estado: aburrido <em>a prop&oacute;sito.</em></h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">map · filter · flatMap, dialecto DataFrame</span></div>
+      <div class="code-body">orders = stream.<span class="fn">select</span>(<span class="fn">from_json</span>(col(<span class="s">"value"</span>).<span class="fn">cast</span>(<span class="s">"string"</span>),
+                                  order_schema).<span class="fn">alias</span>(<span class="s">"d"</span>)).<span class="fn">select</span>(<span class="s">"d.*"</span>)
+
+big    = orders.<span class="fn">filter</span>(col(<span class="s">"amount"</span>) &gt; <span class="g">50</span>)              <span class="cm"># filter = filter</span>
+taxed  = orders.<span class="fn">withColumn</span>(<span class="s">"tax"</span>, col(<span class="s">"amount"</span>) * <span class="g">0.08</span>) <span class="cm"># select/withColumn = map</span>
+items  = orders.<span class="fn">select</span>(<span class="fn">explode</span>(<span class="s">"line_items"</span>))           <span class="cm"># explode = flatMap</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Id&eacute;ntico al c&oacute;digo de DataFrame por lotes &mdash; ese es el punto. Que no haya memoria entre eventos significa nada que checkpointar, nada que perder, nada que ense&ntilde;ar. La parte dif&iacute;cil empieza cuando la respuesta depende de <strong>m&aacute;s de un evento</strong>: agregaci&oacute;n. Y agregar sobre una tabla sin fin fuerza la pregunta del <strong>tiempo</strong>.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>SIN ESTADO</span><span>select &middot; filter &middot; explode</span></div>
+</section>
+
+<!-- ─── 08 · EVENT TIME vs PROCESSING TIME ─────────────── -->
+<section class="slide deep" id="s8">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker hot reveal">Hora 1 &middot; el concepto m&aacute;s importante</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Cuando <em>ocurri&oacute;</em> vs cuando t&uacute; <em class="hot">lo viste.</em></h2>
+    <div class="two-col reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem);flex:unset;">
+      <div class="col">
+        <span class="col-label" style="color:var(--cyan);">Tiempo de evento</span>
+        <p class="sub" style="margin-top:0.2rem;"><span class="ink-mono">created_at</span> &mdash; cuando el pedido realmente ocurri&oacute;, estampado por la fuente. La verdad del negocio.</p>
+      </div>
+      <div class="col">
+        <span class="col-label" style="color:var(--ember);">Tiempo de procesamiento</span>
+        <p class="sub" style="margin-top:0.2rem;">El reloj de pared cuando Spark ve el evento &mdash; despu&eacute;s de la latencia de red, el retraso del consumidor y el retraso del CDC. Un accidente del humor de tu pipeline.</p>
+      </div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt">Agrupar por tiempo de procesamiento y tus n&uacute;meros describen <strong>cu&aacute;ndo tu pipeline tuvo ganas de trabajar</strong>, no cu&aacute;ndo ocurri&oacute; el negocio. T&uacute; mismo probaste la premisa en la Lecci&oacute;n 6: Kafka preserva el orden de <em>llegada</em>, y tu topic barajado lleg&oacute; en el orden equivocado a prop&oacute;sito. Ese topic es el adversario de hoy.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>TIEMPO DE EVENTO</span><span>el reloj del negocio, no el de la pipeline</span></div>
+</section>
+
+<!-- ─── 09 · FLASH SALE PREDICTION ─────────────────────── -->
+<section class="slide" id="s9">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker hot reveal">El fracaso concreto</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Venta flash, 12:00&ndash;12:05. La pipeline se retrasa 30&nbsp;s.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:680px;">Marketing quiere los ingresos de la ventana de la venta. Tu pipeline agrupa por <strong>tiempo de procesamiento</strong>. Predice qu&eacute; reportan las dos ventanas.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:700px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">ventanas por tiempo de procesamiento, 30s de retraso</span></div>
+      <div class="code-body">[12:00, 12:05)   <span class="r">faltan los &uacute;ltimos 30s de la venta</span>   &mdash; venta subcontada
+[12:05, 12:10)   <span class="r">+ 30s de ingresos de venta que nunca gan&oacute;</span> &mdash; post-venta inflado
+
+<span class="cm"># mismos datos, agrupados por tiempo de evento (created_at): ambos n&uacute;meros correctos</span></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt">No ligeramente equivocado &mdash; <strong>estructuralmente</strong> equivocado, y empeora justo cuando el tr&aacute;fico se dispara (el retraso crece durante los momentos que m&aacute;s te importan). Por eso hoy toda expresi&oacute;n de ventaneo agrupa por <span class="ink-mono">created_at</span>.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>POR QU&Eacute; TIEMPO DE EVENTO</span><span>el retraso corrompe las ventanas por tiempo de procesamiento</span></div>
+</section>
+
+<!-- ─── 10 · TUMBLING WINDOWS ──────────────────────────── -->
+<section class="slide" id="s10">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; ventaneo 1/3</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Tumbling: cada evento, <em>una</em> ventana.</h2>
+    <div class="arch reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);padding:clamp(0.9rem,2vh,1.4rem) clamp(0.9rem,1.6vw,1.4rem);">
+<svg viewBox="0 0 980 184" style="width:100%;height:auto;display:block;font-family:'Space Grotesk',sans-serif" role="img" aria-label="Ventanas tumbling: tres ventanas fijas de cinco minutos, sin solapamiento, cada evento cayendo exactamente en una">
+  <rect x="30"  y="40" width="306" height="64" rx="6" fill="rgba(92,214,232,0.11)" stroke="#5cd6e8" stroke-width="1.5"/>
+  <rect x="336" y="40" width="306" height="64" rx="6" fill="rgba(92,214,232,0.05)" stroke="#5cd6e8" stroke-width="1.5"/>
+  <rect x="642" y="40" width="306" height="64" rx="6" fill="rgba(92,214,232,0.11)" stroke="#5cd6e8" stroke-width="1.5"/>
+  <text x="183" y="66" text-anchor="middle" fill="#5cd6e8" font-family="'IBM Plex Mono',monospace" font-size="13" font-weight="600">[12:00, 12:05)</text>
+  <text x="489" y="66" text-anchor="middle" fill="#5cd6e8" font-family="'IBM Plex Mono',monospace" font-size="13" font-weight="600">[12:05, 12:10)</text>
+  <text x="795" y="66" text-anchor="middle" fill="#5cd6e8" font-family="'IBM Plex Mono',monospace" font-size="13" font-weight="600">[12:10, 12:15)</text>
+  <g fill="#5cd6e8">
+    <circle cx="80" cy="90" r="5"/><circle cx="150" cy="90" r="5"/><circle cx="250" cy="90" r="5"/>
+    <circle cx="390" cy="90" r="5"/><circle cx="460" cy="90" r="5"/><circle cx="520" cy="90" r="5"/><circle cx="600" cy="90" r="5"/>
+    <circle cx="700" cy="90" r="5"/><circle cx="800" cy="90" r="5"/><circle cx="890" cy="90" r="5"/>
+  </g>
+  <g stroke="#324050" stroke-width="1.5">
+    <line x1="30" y1="104" x2="30" y2="118"/><line x1="336" y1="104" x2="336" y2="118"/>
+    <line x1="642" y1="104" x2="642" y2="118"/><line x1="948" y1="104" x2="948" y2="118"/>
+  </g>
+  <g fill="#67737f" font-family="'IBM Plex Mono',monospace" font-size="11" text-anchor="middle">
+    <text x="30" y="134">12:00</text><text x="336" y="134">12:05</text>
+    <text x="642" y="134">12:10</text><text x="948" y="134">12:15</text>
+  </g>
+  <text x="489" y="166" text-anchor="middle" fill="#aab4bf" font-size="12.5">tamaño fijo · sin solapamiento · sin huecos — cada evento cae exactamente en <tspan fill="#5cd6e8" font-weight="700">una</tspan> ventana</text>
+</svg></div>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:720px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">la agregaci&oacute;n</span></div>
+      <div class="code-body">revenue = (orders
+    .<span class="fn">groupBy</span>(<span class="fn">window</span>(col(<span class="s">"created_at"</span>), <span class="s">"5 minutes"</span>))   <span class="cm"># event time!</span>
+    .<span class="fn">agg</span>(<span class="fn">sum</span>(<span class="s">"amount"</span>).<span class="fn">alias</span>(<span class="s">"total_revenue"</span>)))
+<span class="cm"># window() yields a struct column: {start, end}</span></div>
+    </div>
+    <p class="sub reveal" style="margin-top:clamp(0.5rem,1.2vh,0.8rem);max-width:700px;">La <span class="term">ventana</span> es solo una clave de agrupaci&oacute;n derivada. La maquinaria de agregaci&oacute;n es el GROUP BY que usas desde la Lecci&oacute;n 3 &mdash; lo nuevo es que los grupos est&aacute;n <em>abiertos</em> hasta que el tiempo diga lo contrario.</p>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>TUMBLING</span><span>fijas &middot; sin solapamiento</span></div>
+</section>
+
+<!-- ─── 11 · SLIDING + SESSION ─────────────────────────── -->
+<section class="slide" id="s11">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; ventaneo 2/3 &amp; 3/3</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Sliding se solapan. Session <em>escucha.</em></h2>
+    <div class="two-col reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;">
+      <div class="col">
+        <span class="col-label" style="color:var(--cyan);">Sliding &mdash; copias solapadas</span>
+        <div class="code-block" style="flex:unset;">
+          <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">ventana de 10 min, slide de 2 min</span></div>
+          <div class="code-body"><span class="fn">window</span>(col(<span class="s">"created_at"</span>),
+       <span class="s">"10 minutes"</span>, <span class="s">"2 minutes"</span>)
+<span class="cm"># each event lands in size/slide</span>
+<span class="cm"># = 5 windows. 5× the state.</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <span class="col-label" style="color:var(--cyan);">Session &mdash; definida por el hueco</span>
+        <div class="code-block" style="flex:unset;">
+          <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">hueco de inactividad de 30 min</span></div>
+          <div class="code-body"><span class="fn">groupBy</span>(col(<span class="s">"user_id"</span>),
+  <span class="fn">session_window</span>(col(<span class="s">"event_time"</span>),
+                 <span class="s">"30 minutes"</span>))
+<span class="cm"># boundary depends on the DATA</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Las ventanas sliding duplican trabajo por dise&ntilde;o &mdash; mediremos la cuenta m&aacute;s tarde. Las ventanas session no pueden ni decir <em>d&oacute;nde terminan</em> sin esperar el hueco. Cada tipo de ventana eventualmente hace la misma pregunta&hellip;</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>SLIDING &middot; SESSION</span><span>costo de solapamiento &middot; los huecos esperan</span></div>
+</section>
+
+<!-- ─── 12 · THE QUESTION ──────────────────────────────── -->
+<section class="slide deep" id="s12">
+  <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;max-width:min(92vw,860px);margin:0 auto;">
+    <div class="kicker reveal" style="color:var(--ember);">La pregunta que toda ventana hace</div>
+    <div class="big-q reveal" style="margin-top:0.8rem;text-align:center;max-width:24ch;">Son las 12:06. &iquest;La ventana [12:00,&nbsp;12:05) ya <em style="color:var(--ember);font-style:normal;">termin&oacute;?</em></div>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.8vh,1.3rem);max-width:620px;">Tal vez &mdash; a menos que un evento de las 12:04 a&uacute;n est&eacute; en tr&aacute;nsito. Emitir ahora y eres r&aacute;pido pero posiblemente equivocado. Esperar y eres correcto pero tard&iacute;o. &iquest;Esperar cu&aacute;nto? <em style="color:var(--ember);font-style:normal;">&iquest;Para siempre?</em> Completitud versus latencia &mdash; no puedes tener ambas, as&iacute; que necesitas un mecanismo que elija un punto en la l&iacute;nea.</p>
+  </div>
+  <div class="meta" style="position:absolute;bottom:clamp(0.8rem,2vh,1.4rem);left:0;right:0;padding:0 clamp(1.4rem,5vw,4.5rem);"><span>EL COMPROMISO</span><span>completo o r&aacute;pido</span></div>
+</section>
+
+<!-- ─── 13 · WATERMARKS ────────────────────────────────── -->
+<section class="slide" id="s13">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; el mecanismo</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">La marca de agua es una <em>promesa.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:720px;">&ldquo;Ning&uacute;n evento m&aacute;s antiguo que T llegar&aacute; de ahora en adelante.&rdquo; Spark lo calcula a partir de los datos: el m&aacute;ximo tiempo de evento visto hasta ahora, menos una tolerancia de retraso que t&uacute; declaras:</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:720px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">una l&iacute;nea, graves consecuencias</span></div>
+      <div class="code-body">orders.<span class="fn">withWatermark</span>(<span class="s">"created_at"</span>, <span class="s">"10 minutes"</span>)
+
+<span class="cm"># watermark = max(created_at seen) − 10 min</span>
+<span class="cm"># seen 12:15 → watermark 12:05 → window [12:00,12:05) is COMPLETE:</span>
+<span class="cm">#   emit its result · drop its state · and anything older that arrives now…</span></div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt">&hellip;se <strong>descarta. Silenciosamente.</strong> Sin error, sin l&iacute;nea de registro, sin cola de mensajes muertos por defecto. La marca de agua tambi&eacute;n es lo que permite a Spark <em>olvidar</em> &mdash; sin ella, cada ventana permanece abierta y el estado crece hasta que el proceso muere. La promesa corta por ambos lados.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>MARCA DE AGUA</span><span>tiempo de evento m&aacute;ximo &minus; retraso permitido</span></div>
+</section>
+
+<!-- ─── 14 · WATERMARK TIMELINE WALKTHROUGH ────────────── -->
+<section class="slide" id="s14">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; cuadro por cuadro</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">M&iacute;rala avanzar, lote a lote.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);max-width:860px;">
+      <thead><tr><th>Micro-lote</th><th class="num">Tiempo de evento m&aacute;ximo visto</th><th class="num">Marca de agua (&minus;10 min)</th><th>Finalizado</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">12:08:00</td><td class="num">11:58:00</td><td>&mdash;</td></tr>
+        <tr><td>2</td><td class="num">12:12:00</td><td class="num">12:02:00</td><td>&mdash;</td></tr>
+        <tr class="cool"><td>3</td><td class="num">12:16:00</td><td class="num">12:06:00</td><td>[12:00, 12:05) emitido, estado liberado</td></tr>
+        <tr><td>4</td><td class="num">12:21:00</td><td class="num">12:11:00</td><td>[12:05, 12:10) emitido</td></tr>
+        <tr class="hot"><td>4&hellip;</td><td class="num" colspan="2">evento con created_at = 12:03 llega</td><td>descartado &mdash; su ventana ya no existe</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Observa qu&eacute; mueve el reloj: <strong>las marcas de tiempo de los datos</strong>, no el reloj de pared. Un pico de 5 minutos de retraso del consumidor no descarta nada &mdash; el rezago a&uacute;n transporta sus tiempos de evento, la marca de agua espera con ellos, varias ventanas se cierran de golpe cuando se alcanza.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>CUADRO POR CUADRO</span><span>la marca de agua sigue a los datos</span></div>
+</section>
+
+<!-- ─── 15 · THE DIAL ──────────────────────────────────── -->
+<section class="slide" id="s15">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">Hora 1 &middot; el dial</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">El retraso es un n&uacute;mero que <em>t&uacute;</em> eliges.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <thead><tr><th>Marca de agua</th><th>Latencia</th><th>Completitud</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td><span class="ink-mono">1 minuto</span></td><td class="cool">las ventanas se cierran r&aacute;pido</td><td class="hot">descartes agresivos</td><td>peque&ntilde;o</td></tr>
+        <tr><td><span class="ink-mono">10 minutos</span></td><td>moderado</td><td>atrapa a la mayor&iacute;a de rezagados</td><td>moderado</td></tr>
+        <tr><td><span class="ink-mono">30 minutos</span></td><td class="hot">los resultados esperan media hora</td><td class="cool">casi todo cuenta</td><td>crece mucho</td></tr>
+        <tr class="hot"><td>ninguno</td><td>modo append: nunca emite</td><td>&ldquo;perfecto&rdquo;, eventualmente</td><td>ilimitado &rarr; OOM</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2h6c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/></svg>
+      <span class="ctxt">No hay un valor correcto &mdash; hay un valor correcto <strong>para una pregunta de negocio</strong>. Un dashboard tolera descartes; la reportaci&oacute;n regulatoria no. Llenar&aacute;s esta tabla con tus propias mediciones en una hora, y el trabajo para casa convierte el retraso en un flag de CLI exactamente por eso.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>EL DIAL</span><span>latencia &harr; completitud &harr; memoria</span></div>
+</section>
+
+<!-- ─── BUILD DIVIDER ──────────────────────────────────── -->
+<section class="slide deep" id="s16">
+  <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;max-width:min(92vw,780px);margin:0 auto;">
+    <div class="kicker reveal" style="color:var(--cyan);">Parte uno</div>
+    <h2 class="reveal" style="font-size:clamp(2rem,5.5vw,3.6rem);margin-top:0.6rem;">Construye la pipeline.</h2>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.8vh,1.3rem);max-width:600px;">Entra un tema de Kafka, salen ingresos por ventana. Los mismos pedidos, el mismo broker, el desorden de la Lecci&oacute;n 6 incluido &mdash; a prop&oacute;sito. Hoy deja de ser una curiosidad y se convierte en el adversario.</p>
+    <div class="tline reveal" style="margin:clamp(1.2rem,2.8vh,2rem) auto 0;max-width:min(80vw,520px);">
+      <div class="rail"></div>
+      <div class="wm" style="left:70%;"></div>
+      <span class="dot" style="animation-delay:-0.5s"></span>
+      <span class="dot" style="animation-delay:-2.9s"></span>
+      <span class="dot late" style="animation-delay:-1.6s"></span>
+    </div>
+  </div>
+  <div class="meta" style="position:absolute;bottom:clamp(0.8rem,2vh,1.4rem);left:0;right:0;padding:0 clamp(1.4rem,5vw,4.5rem);"><span>CONSTR&Uacute;YELO</span><span>Kafka &rarr; Spark &rarr; ingresos por ventana</span></div>
+</section>
+
+<!-- ─── 17 · SETUP ─────────────────────────────────────── -->
+<section class="slide" id="s17">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Configuraci&oacute;n</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Un pip install. Una JVM. Sin cluster.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">shell</span></div>
+      <div class="code-body"><span class="v">$</span> docker compose up -d              <span class="cm"># the L6 broker, same topics</span>
+<span class="v">$</span> uv add pyspark                    <span class="cm"># needs Java 11+ (JAVA_HOME!)</span>
+<span class="v">$</span> uv run python -c <span class="s">"from pyspark.sql import SparkSession; \
+    print(SparkSession.builder.master('local[*]').getOrCreate().version)"</span>
+<span class="n">4.0.x</span>                               <span class="cm"># prints a version = you're done</span>
+<span class="v">$</span> uv run python src/seed_events.py  <span class="cm"># 10k orders … 5% arrive 1–10 min late</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+      <span class="ctxt">El generador incluye un <strong>5% de eventos retrasados</strong> &mdash; los rezagados tard&iacute;os que toda pipeline real tiene (clientes m&oacute;viles, reintentos, retraso del CDC). Son la poblaci&oacute;n de prueba para todo lo que hacemos con marcas de agua.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ENTORNO</span><span>pyspark local[*] &middot; L6 Kafka</span></div>
+</section>
+
+<!-- ─── 18 · PHASE 1: READ + PARSE ─────────────────────── -->
+<section class="slide" id="s18">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Fase 1 &middot; stream_revenue.py</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Lee, parsea, demuestra que fluye.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">stream_revenue.py — ingestión</span></div>
+      <div class="code-body">raw = (spark.readStream.<span class="fn">format</span>(<span class="s">"kafka"</span>)
+    .<span class="fn">option</span>(<span class="s">"kafka.bootstrap.servers"</span>, <span class="s">"localhost:19092"</span>)
+    .<span class="fn">option</span>(<span class="s">"subscribe"</span>, <span class="s">"orders-cdc"</span>)
+    .<span class="fn">option</span>(<span class="s">"startingOffsets"</span>, <span class="s">"earliest"</span>)   <span class="cm"># default is latest = you see NOTHING</span>
+    .<span class="fn">load</span>())
+
+orders = raw.<span class="fn">select</span>(<span class="fn">from_json</span>(col(<span class="s">"value"</span>).<span class="fn">cast</span>(<span class="s">"string"</span>),
+                              order_schema).<span class="fn">alias</span>(<span class="s">"d"</span>)).<span class="fn">select</span>(<span class="s">"d.*"</span>)
+
+orders.writeStream.<span class="fn">format</span>(<span class="s">"console"</span>)              <span class="cm"># sink #1: your eyes</span>
+    .<span class="fn">trigger</span>(processingTime=<span class="s">"5 seconds"</span>).<span class="fn">start</span>()</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Las filas parseadas deber&iacute;an imprimirse cada 5 segundos. <strong>Depura aqu&iacute;, no despu&eacute;s</strong> &mdash; un parseo roto dentro de una agregaci&oacute;n por ventanas es una miseria para diagnosticar. (La primera ejecuci&oacute;n descarga el JAR del conector Kafka de Maven; lento una vez, cacheado despu&eacute;s.)</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>FASE 1</span><span>readStream &middot; from_json &middot; console</span></div>
+</section>
+
+<!-- ─── 19 · PHASE 2: WINDOWED AGGREGATION ─────────────── -->
+<section class="slide" id="s19">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Fase 2 &middot; la agregaci&oacute;n</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Ingresos por ventana de 5 minutos.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">stream_revenue.py — el núcleo</span></div>
+      <div class="code-body">windowed = (orders
+    .<span class="fn">withWatermark</span>(<span class="s">"created_at"</span>, <span class="s">"10 minutes"</span>)      <span class="cm"># the promise</span>
+    .<span class="fn">groupBy</span>(<span class="fn">window</span>(col(<span class="s">"created_at"</span>), <span class="s">"5 minutes"</span>)) <span class="cm"># the question</span>
+    .<span class="fn">agg</span>(<span class="fn">sum</span>(<span class="s">"amount"</span>).<span class="fn">alias</span>(<span class="s">"total_revenue"</span>),
+         <span class="fn">count</span>(<span class="s">"*"</span>).<span class="fn">alias</span>(<span class="s">"order_count"</span>),
+         <span class="fn">avg</span>(<span class="s">"amount"</span>).<span class="fn">alias</span>(<span class="s">"avg_order_value"</span>)))
+
+windowed.writeStream.<span class="fn">outputMode</span>(<span class="s">"update"</span>)            <span class="cm"># ← matters, next slide</span>
+    .<span class="fn">format</span>(<span class="s">"console"</span>).<span class="fn">trigger</span>(processingTime=<span class="s">"10 seconds"</span>).<span class="fn">start</span>()</div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt">Tres l&iacute;neas resumen toda la lecci&oacute;n: la marca de agua (cu&aacute;nto esperar), la ventana (qu&eacute; preguntar), el trigger (con qu&eacute; frecuencia mirar). <strong>Tres controles independientes.</strong> Mezclarlos es el error cl&aacute;sico de streaming.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>FASE 2</span><span>watermark &middot; window &middot; trigger</span></div>
+</section>
+
+<!-- ─── 20 · OUTPUT MODES (LIVE) ───────────────────────── -->
+<section class="slide" id="s20">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">En vivo &middot; modos de salida</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Cambia <span class="ink-mono">update</span> a <span class="ink-mono">append</span>. &iquest;Cu&aacute;ndo se imprime la primera fila?</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;"><span class="ink-mono">update</span> emite resultados parciales cada lote &mdash; observaste c&oacute;mo se llenan las ventanas. Ahora reinicia en modo <span class="ink-mono">append</span>, que solo emite resultados <em>finales</em>. Predice el retraso.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:720px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">modo append, ventanas de 5 min, marca de agua de 10 min</span></div>
+      <div class="code-body">batch 0 … <span class="cm">(empty)</span>     batch 1 … <span class="cm">(empty)</span>     batch 2 … <span class="cm">(empty)</span>
+<span class="cm"># nothing — until the watermark passes a window's END.</span>
+<span class="cm"># first output ≈ window(5m) + lateness(10m) of EVENT TIME later:</span>
+batch 9:  [12:00, 12:05)  $14,382.91  427 orders   <span class="n">final, immutable</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Ese silencio no es un bug &mdash; es la tolerancia de retraso <strong>funcionando</strong>. <span class="ink-mono">append</span> = filas limpias e inmutables para sumideros que no pueden actualizar; <span class="ink-mono">update</span> = upserts para dashboards y desarrollo. (<span class="ink-mono">complete</span> re-emite toda la tabla cada lote; solo para demos peque&ntilde;as.)</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>MODOS DE SALIDA</span><span>append espera a la marca de agua</span></div>
+</section>
+
+<!-- ─── 21 · LIVE: TRIGGER vs WINDOW ───────────────────── -->
+<section class="slide" id="s21">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">En vivo &middot; la prueba de independencia</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Trigger de 1&nbsp;s a 30&nbsp;s. &iquest;Cambian los totales?</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:680px;">La misma pipeline, tres ejecuciones: <span class="ink-mono">processingTime</span> de 1, 5 y 30 segundos. Predice el efecto en los resultados de ventanas antes de ejecutarlo.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:720px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">tres ejecuciones, mismos datos</span></div>
+      <div class="code-body">trigger=1s    many tiny batches, results trickle in
+trigger=5s    fewer batches, same numbers
+trigger=30s   few big batches,  same numbers
+
+[12:00, 12:05) = <span class="n">$14,382.91 in all three runs</span>   <span class="cm"># identical. always.</span></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt"><strong>El trigger controla la latencia. La ventana controla la pregunta. Nunca se intercambian.</strong> Confundirlos produce pipelines con triggers de 1 segundo &ldquo;por precisi&oacute;n&rdquo; (desperdicio) o ventanas de 5 minutos &ldquo;por velocidad&rdquo; (respuestas equivocadas). Ahora tienes el comprobante de que son ortogonales.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>EN VIVO</span><span>trigger &ne; ventana &middot; latencia &ne; correcci&oacute;n</span></div>
+</section>
+
+<!-- ─── LOSE-DATA DIVIDER ──────────────────────────────── -->
+<section class="slide deep" id="s22">
+  <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;max-width:min(92vw,780px);margin:0 auto;">
+    <div class="kicker reveal" style="color:var(--ember);">Parte dos</div>
+    <h2 class="reveal" style="font-size:clamp(2rem,5.5vw,3.6rem);margin-top:0.6rem;">Ahora pierde algo de <em class="hot">datos.</em></h2>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.8vh,1.3rem);max-width:600px;">La marca de agua es una promesa, y las promesas se rompen. Eventos tard&iacute;os, el descarte silencioso, la m&eacute;trica que lo atrapa y el modo de fallo donde olvidar una l&iacute;nea significa que la pipeline nunca vuelve a hablar.</p>
+  </div>
+  <div class="meta" style="position:absolute;bottom:clamp(0.8rem,2vh,1.4rem);left:0;right:0;padding:0 clamp(1.4rem,5vw,4.5rem);"><span>AHORA R&Oacute;MPELO</span><span>eventos tard&iacute;os &middot; descartes &middot; la marca de agua faltante</span></div>
+</section>
+
+<!-- ─── 23 · LIVE: THE $49,999.50 DROP ─────────────────── -->
+<section class="slide" id="s23">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker hot reveal">Ruptura 01 &middot; en vivo &middot; inject_late.py</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Llegan 50 pedidos. &iquest;D&oacute;nde <em class="hot">aterrizan?</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;">La pipeline ha estado corriendo; la marca de agua est&aacute; mucho m&aacute;s all&aacute; de las 12:10. Inyectamos 50 pedidos de $999.99 cada uno, con <span class="ink-mono">created_at = 12:05</span> &mdash; una ventana emitida hace mucho. Predice qu&eacute; hace la pipeline.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:740px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">$ uv run python src/inject_late.py --at "12:05" --count 50</span></div>
+      <div class="code-body">injected 50 events · $49,999.50 of revenue · created_at=12:05:00
+
+console sink:  <span class="cm">(no new output)</span>
+[12:05, 12:10) window:  <span class="r">unchanged — already emitted, state gone</span>
+errors raised:          <span class="r">none</span>
+log messages:           <span class="r">none</span>
+
+<span class="r">$49,999.50 — vanished. silently.</span></div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt">Tercera mentira silenciosa del curso: el polling se desvi&oacute; (L5), el esquema se trag&oacute; una columna (L5), ahora la marca de agua se come los ingresos. El patr&oacute;n: <strong>los valores por defecto fallan en silencio; t&uacute; a&ntilde;ades la alarma.</strong> Siguiente diapositiva: d&oacute;nde vive la alarma.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>RUPTURA 01 &middot; EN VIVO</span><span>tard&iacute;o = descartado &middot; sin error &middot; sin rastro</span></div>
+</section>
+
+<!-- ─── 24 · THE SMOKING GUN METRIC ────────────────────── -->
+<section class="slide" id="s24">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Ruptura 01 &middot; la alarma</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">El contador que <em>delata</em> a la marca de agua.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">$ uv run python src/watch_progress.py   (lee query.lastProgress)</span></div>
+      <div class="code-body">batch 47   input 312 rows/s   processed 298 rows/s
+state:     numRowsTotal   <span class="g">1,204</span>     <span class="cm"># open windows being remembered</span>
+           numRowsUpdated <span class="g">96</span>
+           <span class="r">numRowsDroppedByWatermark   1</span>   <span class="cm"># 50 late orders, ONE window = 1 group</span>
+<span class="cm"># it counts dropped GROUPS, not events &mdash; the $49,999.50 hides in a hot key</span></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>
+      <span class="ctxt">Cada bloque de este curso termina en un n&uacute;mero operativo: TPS (L1), retraso de slot (L5), retraso del consumidor (L6) &mdash; y ahora <span class="ink-mono">numRowsDroppedByWatermark</span>. Cero significa que tu tolerancia de retraso es suficientemente generosa. Distinto de cero significa que est&aacute;s enviando n&uacute;meros equivocados, <strong>a sabiendas</strong> &mdash; una decisi&oacute;n de negocio, no un bug. Una advertencia que <em>es</em> la lecci&oacute;n: cuenta <strong>grupos de agregaci&oacute;n</strong> descartados, no eventos &mdash; 50 pedidos tard&iacute;os en una ventana se leen como <strong>+1</strong>. Tr&aacute;talo como un cable de seguridad (cero vs distinto de cero); recupera los d&oacute;lares perdidos con la auditor&iacute;a por lotes.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>LA M&Eacute;TRICA</span><span>numRowsDroppedByWatermark</span></div>
+</section>
+
+<!-- ─── 25 · LIVE: THE DIAL TABLE ──────────────────────── -->
+<section class="slide" id="s25">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Ruptura 02 &middot; en vivo &middot; gira el dial</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Mismos datos. Tres marcas de agua.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:680px;">Vuelve a ejecutar con <span class="ink-mono">--watermark</span> en 1, 10 y 30 minutos contra el flujo sembrado (~5% de eventos llegan tarde, cola exponencial hasta ~45 min). Predice cada fila antes del desvelo.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:740px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">$ uv run python src/stream_revenue.py --watermark &lt;N&gt;</span></div>
+      <div class="code-body"><span class="cm">watermark   dropped   first append output   peak state</span>
+1 min        <span class="r">92</span>      fast (~6 min)         <span class="n">~5</span>
+10 min       <span class="n">43</span>      moderate (~15 min)    <span class="n">~5</span>
+30 min        <span class="n">4</span>      slow (~35 min)        <span class="n">~8</span>
+<span class="cm"># measured: 10k topic, default --max-per-trigger 300. smaller batches sharpen the</span>
+<span class="cm"># dial (more drops); your seed's random draw will differ — that's the point.</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span class="ctxt">Esta tabla <em>es</em> el compromiso completitud/latencia, medido en tus propios datos &mdash; y es la tabla que tu README del trabajo para casa debe contener, con tus n&uacute;meros y tu recomendaci&oacute;n.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>RUPTURA 02 &middot; EN VIVO</span><span>el dial, medido</span></div>
+</section>
+
+<!-- ─── 26 · THE NO-WATERMARK FAILURE ──────────────────── -->
+<section class="slide" id="s26">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker hot reveal">Ruptura 03 &middot; en vivo &middot; olvida una l&iacute;nea</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Sin marca de agua: <em class="hot">rechazado</em>, o silenciosamente fatal.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:680px;">Borra la l&iacute;nea <span class="ink-mono">withWatermark</span> y ejecuta. Predice qu&eacute; hace <span class="ink-mono">append</span> primero &mdash; y luego qu&eacute; hace <span class="ink-mono">update</span>.</p>
+    <div class="code-block reveal spoiler" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:740px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">$ uv run python src/experiment_no_watermark.py</span></div>
+      <div class="code-body"><span class="cm"># PART A — append + no watermark: Spark REFUSES to even start</span>
+[STREAMING_OUTPUT_MODE.UNSUPPORTED_OPERATION] append not supported for
+streaming aggregations <span class="r">without a watermark</span>      <span class="cm"># fail-fast = a feature</span>
+
+<span class="cm"># PART B — update + no watermark: THIS one runs, looks healthy, never forgets</span>
+state rows:  6 &rarr; 9 &rarr; 12 &rarr; 14 &rarr; <span class="r">… climbs forever &rarr; OOM</span>   <span class="cm"># no window ever finalized</span></div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt"><strong>Append falla r&aacute;pido</strong> &mdash; solo puede emitir ventanas <em>finales</em>, y sin marca de agua ninguna es demostrablemente final, as&iacute; que Spark prefiere rechazar en lugar de prometer silencio eterno. El asesino de las 3&nbsp;a.&nbsp;m. es la versi&oacute;n que <em>s&iacute;</em> corre: <span class="ink-mono">update</span> sin marca de agua, el estado creciendo ilimitadamente sin que nadie vigile &mdash; el slot abandonado de L5, reencarnado. Una marca de agua no es una optimizaci&oacute;n; para una agregaci&oacute;n por ventanas en producci&oacute;n es un requisito.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>RUPTURA 03 &middot; EN VIVO</span><span>append rechaza &middot; update crece hasta OOM</span></div>
+</section>
+
+<!-- ─── 27 · EXPERIMENT: SLIDING WINDOW COST ───────────── -->
+<section class="slide" id="s27">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Experimento &middot; el precio del solapamiento</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Desliza cada minuto. Paga <em>diez veces.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;">Cambia la ventana tumbling por <span class="ink-mono">window(created_at, "10 minutes", "1 minute")</span>. Cada evento ahora pertenece a 10 ventanas. Observa <span class="ink-mono">numRowsTotal</span>:</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:700px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">$ uv run python src/experiment_sliding.py</span></div>
+      <div class="code-body">tumbling 5m         peak state:  <span class="n">~6</span>    output/batch: 1×
+sliding 10m / 1m    peak state:  <span class="r">~34</span>   output/batch: 10×  <span class="cm"># each event → 10 windows</span>
+                    state ≈ <span class="r">5.7×</span> — under 10× because the watermark evicts
+                    old windows, so not all 10 sit open at once
+<span class="cm"># measured on the 10k topic; the RATIO (≈ size/slide) is the transferable number,</span>
+<span class="cm"># not the absolutes — at production volume these are thousands of rows.</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2h6c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/></svg>
+      <span class="ctxt"><strong>Pregunta r&aacute;pida:</strong> una ventana de 1 hora desliz&aacute;ndose cada 10 segundos &mdash; &iquest;cu&aacute;ntas ventanas por evento? <em>360.</em> El estado y el c&oacute;mputo escalan con <span class="ink-mono">size&nbsp;/&nbsp;slide</span>. Esa raz&oacute;n es un n&uacute;mero de planificaci&oacute;n de capacidad, de la misma forma que el conteo de particiones lo fue en L6. Los dashboards suaves se compran con RAM.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>COSTO DE SLIDING</span><span>estado &times; (size / slide)</span></div>
+</section>
+
+<!-- ─── 28 · EXPERIMENT: TWO QUERIES + KAFKA SINK ──────── -->
+<section class="slide" id="s28">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">Experimento &middot; hacia la forma de producci&oacute;n</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Bifurca el flujo. Aterriza en Kafka.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:760px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">stream_to_kafka.py — dos consultas, una fuente</span></div>
+      <div class="code-body"><span class="cm"># q1: revenue per 5 min → kafka topic "revenue-per-window"</span>
+out = windowed.<span class="fn">select</span>(to_json(struct(<span class="s">"window.start"</span>, <span class="s">"total_revenue"</span>, ...))
+                      .<span class="fn">alias</span>(<span class="s">"value"</span>))   <span class="cm"># kafka wants key/value strings</span>
+out.writeStream.<span class="fn">format</span>(<span class="s">"kafka"</span>).<span class="fn">option</span>(<span class="s">"topic"</span>, <span class="s">"revenue-per-window"</span>)
+   .<span class="fn">option</span>(<span class="s">"checkpointLocation"</span>, <span class="s">"ckpt/revenue"</span>).<span class="fn">start</span>()
+
+<span class="cm"># q2: orders per customer per 15 min → its OWN checkpoint dir</span>
+q2.writeStream.<span class="fn">option</span>(<span class="s">"checkpointLocation"</span>, <span class="s">"ckpt/customers"</span>).<span class="fn">start</span>()</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt"><strong>Un directorio de checkpoint por consulta, nunca compartido</strong> &mdash; dos consultas en un checkpoint se corrompen mutuamente. Luego la vuelta de la victoria: consume <span class="ink-mono">revenue-per-window</span> con tu consumidor de la Lecci&oacute;n&nbsp;6, mata el trabajo de Spark, rein&iacute;cialo y verifica que reanuda desde el checkpoint sin reprocesar. La demo de fallo de L5, heredada gratis.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>SUMIDERO KAFKA</span><span>checkpoint = offsets + estado, at&oacute;micamente</span></div>
+</section>
+
+<!-- ─── 29 · SYNTHESIS: THREE DIALS ────────────────────── -->
+<section class="slide" id="s29">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">S&iacute;ntesis</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Tres controles, una frase cada uno.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);max-width:860px;">
+      <thead><tr><th>Control</th><th>Controla</th><th>Nunca controla</th></tr></thead>
+      <tbody>
+        <tr><td class="cool">ventana</td><td>la granularidad de la pregunta (&ldquo;cada 5 minutos&rdquo;)</td><td>frescura</td></tr>
+        <tr><td class="cool">trigger</td><td>con qu&eacute; frecuencia se actualizan los resultados</td><td>correcci&oacute;n</td></tr>
+        <tr><td class="cool">marca de agua</td><td>paciencia con rezagados (&amp; tama&ntilde;o del estado)</td><td>la pregunta</td></tr>
+      </tbody>
+    </table>
+    <div class="callout proof reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt"><strong>La pregunta de entrevista:</strong> &ldquo;ingresos por minuto, refrescados cada 10 segundos, tolerando 2 minutos de datos tard&iacute;os.&rdquo; Ahora puedes leer la especificaci&oacute;n directamente en par&aacute;metros: ventana tumbling de 1 minuto &middot; trigger de 10 segundos &middot; marca de agua de 2 minutos. En modo update, parciales cada 10&nbsp;s; en append, finales ~2 minutos despu&eacute;s de que cada ventana se cierra.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>S&Iacute;NTESIS</span><span>window &middot; trigger &middot; watermark</span></div>
+</section>
+
+<!-- ─── 30 · STREAMING FOR SPEED, BATCH FOR TRUTH ──────── -->
+<section class="slide" id="s30">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">S&iacute;ntesis &middot; el 0,1 % descartado</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Streaming para la velocidad. <em>Lotes para la verdad.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:720px;">Tu marca de agua descarta el 0,1% de eventos. &iquest;Aceptable? Para un dashboard, probablemente. Para finanzas, no. Pero nota qu&eacute; significa &ldquo;descartado&rdquo;: descartado <em>de la respuesta del stream</em>. Los eventos a&uacute;n existen &mdash; en Kafka, en Postgres.</p>
+    <div class="callout proof reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="ctxt">As&iacute; que el patr&oacute;n de producci&oacute;n: el <strong>stream</strong> sirve la respuesta r&aacute;pida y aproximadamente completa; la <strong>pipeline de lotes de L4</strong> &mdash; idempotente, reejecutable, en la que ya conf&iacute;as a las 3&nbsp;a.&nbsp;m. &mdash; reconcilia la verdad cada noche. La Lecci&oacute;n 4 no fue reemplazada por el streaming. Se convirti&oacute; en la auditor&iacute;a. Ver&aacute;s este emparejamiento de nuevo en las Lecciones 10&ndash;11.</span>
+    </div>
+    <div class="reveal" style="display:flex;gap:clamp(1.2rem,4vw,3rem);flex-wrap:wrap;margin-top:clamp(0.8rem,1.8vh,1.3rem);">
+      <div><div class="stat cool">seconds</div><div class="stat-label">stream: latencia, ~completo</div></div>
+      <div><div class="stat">nightly</div><div class="stat-label">lotes: exacto, reconcilia descartes</div></div>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>EL EMPAREJAMIENTO</span><span>respuestas del stream &middot; auditor&iacute;as por lotes</span></div>
+</section>
+
+<!-- ─── 31 · WHAT'S NEXT → L8 ──────────────────────────── -->
+<section class="slide deep" id="s31">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker hot reveal">Qu&eacute; sigue</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">El procesador adquiere una <em class="hot">memoria.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:720px;">El estado de hoy era peque&ntilde;o y desechable: ventanas abiertas, descartadas seg&uacute;n un cronograma. Lo siguiente: joins entre flujos, deduplicaci&oacute;n, sessionizaci&oacute;n &mdash; estado que debe sobrevivir a <span class="ink-mono">kill -9</span> y volver <em>exactamente</em> correcto. Adem&aacute;s el problema de los dos generales, y por qu&eacute; exactly-once de extremo a extremo es te&oacute;ricamente imposible y pr&aacute;cticamente alcanzado de todos modos.</p>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--ember)" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span class="ctxt">Advertencia justa, a prop&oacute;sito: <strong>la Lecci&oacute;n 8 es la clase m&aacute;s dif&iacute;cil del curso.</strong> El directorio de checkpoint de hoy &mdash; lo que guarda silenciosamente offsets y estado de ventanas cada lote &mdash; es el protagonista. La nota promisoria exactly-once de L6 vence.</span>
+    </div>
+  </div>
+  <div class="meta" style="position:absolute;bottom:clamp(0.8rem,2vh,1.4rem);left:0;right:0;padding:0 clamp(1.4rem,5vw,4.5rem);"><span>QU&Eacute; SIGUE</span><span>stateful ops &middot; checkpoints &middot; exactly-once</span></div>
+</section>
+
+<!-- ─── 32 · TAKE-HOME ─────────────────────────────────── -->
+<section class="slide" id="s32">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="section-marker reveal">Trabajo para casa</div>
+    <h2 class="reveal" style="margin-top:clamp(0.4rem,1vh,0.8rem);">Entrega una ventana que puedas <em>defender.</em></h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:720px;">Una pipeline de ingresos por ventanas sobre eventos CDC de Kafka, donde la tolerancia de retraso es una decisi&oacute;n que tomaste con evidencia, no un n&uacute;mero que copiaste.</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);max-width:780px;">
+      <li><strong>Marca de agua configurable</strong> &mdash; retraso permitido como argumento de CLI, nunca codificado de forma r&iacute;gida.</li>
+      <li><strong>Inyector de eventos tard&iacute;os</strong> &mdash; y la observaci&oacute;n registrada de qu&eacute; hizo cada marca de agua con ellos.</li>
+      <li><strong>La tabla de completitud/latencia</strong> &mdash; 1 / 10 / 30 minutos, llena con <em>tus</em> descartes, retrasos y filas de estado medidos.</li>
+      <li><strong>An&aacute;lisis de compromisos en el README</strong> &mdash; qu&eacute; marca de agua ejecutar&iacute;as en producci&oacute;n con estos datos, y por qu&eacute;.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+      <span class="ctxt">Est&aacute;ndar del entregable: el calificador ejecuta tu pipeline, inyecta eventos tard&iacute;os y verifica que <span class="ink-mono">numRowsDroppedByWatermark</span> coincida con la historia de tu README. Repo + README + CLAUDE.md/AGENTS.md, v&iacute;a PR. La asistencia de IA est&aacute; bien &mdash; la nota es que la <em>sem&aacute;ntica</em> est&eacute; correcta.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ENTREGABLE</span><span>marca de agua como decisi&oacute;n argumentada</span></div>
+</section>
+
+<!-- ─── 33 · ANNEX · RUN IT ────────────────────────────── -->
+<section class="slide" id="s33">
+  <div class="slide-content" style="max-width:min(92vw,880px);margin:0 auto;">
+    <div class="kicker reveal">Anexo</div>
+    <h2 class="reveal" style="margin-top:clamp(0.3rem,0.8vh,0.6rem);">Ejec&uacute;talo t&uacute; mismo.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);flex:unset;max-width:780px;">
+      <div class="code-header"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><span class="code-label">de extremo a extremo</span></div>
+      <div class="code-body"><span class="v">$</span> docker compose up -d                            <span class="cm"># L6 Kafka, same broker</span>
+<span class="v">$</span> uv run python src/seed_events.py                <span class="cm"># 10k orders, 5% late 1–10 min</span>
+<span class="v">$</span> uv run python src/stream_revenue.py --watermark 10  <span class="cm"># the pipeline</span>
+<span class="v">$</span> uv run python src/watch_progress.py             <span class="cm"># terminal 2: drops + state</span>
+<span class="v">$</span> uv run python src/inject_late.py --at "12:05"   <span class="cm"># break 01: the vanishing</span>
+<span class="v">$</span> uv run python src/experiment_no_watermark.py    <span class="cm"># break 03: eternal silence</span>
+<span class="v">$</span> uv run python src/experiment_sliding.py         <span class="cm"># the overlap bill</span>
+<span class="v">$</span> uv run python src/stream_to_kafka.py            <span class="cm"># sink to revenue-per-window</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+      <span class="ctxt">Reinicio: borra los directorios <span class="ink-mono">ckpt/</span> para reiniciar desde <span class="ink-mono">earliest</span>; vuelve a sembrar el tema para obtener tiempos de evento frescos. Verifica los resultados downstream con tu consumidor de L6 en <span class="ink-mono">revenue-per-window</span>.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ANEXO &middot; EJECUCI&Oacute;N</span><span>uv run python src/&lt;script&gt;</span></div>
+</section>
+
+<!-- ─── 34 · ANNEX · OPENCODE PROMPTS ──────────────────── -->
+<section class="slide" id="s34">
+  <div class="slide-content" style="max-width:min(92vw,880px);margin:0 auto;">
+    <div class="kicker reveal">Anexo &middot; IA en el bucle</div>
+    <h2 class="reveal" style="margin-top:clamp(0.3rem,0.8vh,0.6rem);">Prompts para esta pipeline.</h2>
+    <p class="sub reveal" style="margin-top:0.4rem;max-width:700px;">Deja que <span class="ink-mono">opencode</span> redacte el boilerplate; t&uacute; eres due&ntilde;o de la sem&aacute;ntica (columna de tiempo de evento, valor de la marca de agua, modo de salida &mdash; las cosas que cambian la respuesta).</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <span class="plabel">pipeline</span>
+      <span class="pcmd">Write a PySpark Structured Streaming job reading topic 'orders-cdc' (localhost:19092), parsing JSON orders, computing sum/count/avg of amount per 5-minute tumbling window on created_at, with --watermark MINUTES as a CLI arg, console sink, update mode.</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem);">
+      <span class="plabel">monitor</span>
+      <span class="pcmd">Add a thread that prints query.lastProgress every 10s: batchId, input rows/s, and stateOperators numRowsTotal + numRowsDroppedByWatermark.</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.4rem,1vh,0.7rem);">
+      <span class="plabel">romperlo</span>
+      <span class="pcmd">Write inject_late.py producing 50 orders with created_at set hours in the past (CLI: --at, --count) so I can watch the watermark drop them.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ANEXO &middot; OPENCODE</span><span>redactar boilerplate &middot; dominar la sem&aacute;ntica</span></div>
+</section>
+
+<!-- ─── 35 · ANNEX · GOTCHAS ───────────────────────────── -->
+<section class="slide" id="s35">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="kicker reveal">Anexo</div>
+    <h2 class="reveal" style="margin-top:clamp(0.3rem,0.8vh,0.6rem);">Lee antes de depurar.</h2>
+    <ul class="bullets reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);max-width:840px;">
+      <li><strong><span class="ink-mono">JAVA_HOME</span>.</strong> PySpark necesita Java 11+. <span class="ink-mono">brew install openjdk@17</span> y exporta la ruta. Casi todo &ldquo;Spark no arranca&rdquo; es esto.</li>
+      <li><strong>La primera ejecución es lenta.</strong> <span class="ink-mono">spark.jars.packages</span> descarga el conector Kafka de Maven una vez. No es un bloqueo &mdash; espera, se cachea.</li>
+      <li><strong>&iquest;No ves nada?</strong> El <span class="ink-mono">startingOffsets</span> por defecto es <span class="ink-mono">latest</span> &mdash; solo eventos nuevos. Usa <span class="ink-mono">earliest</span> en el laboratorio.</li>
+      <li><strong>Un directorio de checkpoint por consulta.</strong> Checkpoints compartidos corrompen ambas consultas. &iquest;Cambiaste la l&oacute;gica de agregaci&oacute;n? Borra el checkpoint, fija el plan viejo.</li>
+      <li><strong>La marca de agua es global.</strong> Sigue el tiempo de evento m&aacute;ximo entre todas las particiones &mdash; una partici&oacute;n atascada no la detendr&aacute;, y los eventos de esa partici&oacute;n pueden descartarse cuando se recupere. Trampa operativa, rara en el laboratorio, real en producci&oacute;n.</li>
+      <li><strong>Desarrolla en modo <span class="ink-mono">update</span>.</strong> El silencio de <span class="ink-mono">append</span> hasta la marca de agua se ve exactamente como una pipeline rota mientras iteras.</li>
+    </ul>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ANEXO &middot; TRAMPAS</span><span>java &middot; jars &middot; offsets &middot; checkpoints</span></div>
+</section>
+
+<!-- ─── 36 · ANNEX · SCRIPTS ───────────────────────────── -->
+<section class="slide" id="s36">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Anexo</div>
+    <h2 class="reveal" style="margin-top:clamp(0.3rem,0.8vh,0.6rem);">Cada script de esta lecci&oacute;n.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem);">
+      <thead><tr><th>Script</th><th>Qu&eacute; hace</th><th>Diapositiva</th></tr></thead>
+      <tbody>
+        <tr><td><span class="ink-mono">seed_events.py</span></td><td>10k pedidos a Kafka, 5% retrasados 1&ndash;10 min</td><td>17</td></tr>
+        <tr><td><span class="ink-mono">stream_revenue.py</span></td><td>Ingresos por ventana; <span class="ink-mono">--watermark</span>, <span class="ink-mono">--trigger</span>, <span class="ink-mono">--mode</span></td><td>18&ndash;21, 25</td></tr>
+        <tr><td><span class="ink-mono">watch_progress.py</span></td><td>lastProgress: tasas, filas de estado, descartes</td><td>24</td></tr>
+        <tr><td><span class="ink-mono">inject_late.py</span></td><td>Eventos estampados en el pasado; <span class="ink-mono">--at</span>, <span class="ink-mono">--count</span></td><td>23</td></tr>
+        <tr><td><span class="ink-mono">experiment_no_watermark.py</span></td><td>Append + sin marca de agua: el silencio eterno</td><td>26</td></tr>
+        <tr><td><span class="ink-mono">experiment_sliding.py</span></td><td>Costo de estado tumbling vs sliding</td><td>27</td></tr>
+        <tr><td><span class="ink-mono">stream_to_kafka.py</span></td><td>Dos consultas, dos checkpoints, sumidero Kafka</td><td>28</td></tr>
+      </tbody>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.4vh,1rem);">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+      <span class="ctxt">Todo bajo <span class="ink-mono">src-lesson7/src/</span>, misma disposici&oacute;n que las Lecciones 4&ndash;6: <span class="ink-mono">docker compose up -d</span>, luego <span class="ink-mono">uv run python src/&lt;script&gt;.py</span>.</span>
+    </div>
+  </div>
+  <hr class="rule" style="margin-bottom:0.7rem;">
+  <div class="meta"><span>ANEXO &middot; SCRIPTS</span><span>src-lesson7/src/</span></div>
+</section>
+
+<script>
+/* ============ navigation + reveal orchestration ============ */
+const slides=[...document.querySelectorAll('.slide')];
+const bar=document.getElementById('progressBar');
+const io=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      const i=slides.indexOf(e.target);
+      bar.style.width=((i+1)/slides.length*100)+'%';
+    }
+  });
+},{threshold:0.5});
+slides.forEach(s=>io.observe(s));
+
+function go(n){const i=Math.max(0,Math.min(slides.length-1,n));slides[i].scrollIntoView({behavior:'smooth'});}
+function current(){
+  let best=0,bestTop=Infinity;
+  slides.forEach((s,i)=>{const t=Math.abs(s.getBoundingClientRect().top);if(t<bestTop){bestTop=t;best=i;}});
+  return best;
+}
+window.addEventListener('keydown',(e)=>{
+  if(['ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();go(current()+1);}
+  else if(['ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(current()-1);}
+  else if(e.key==='Home'){e.preventDefault();go(0);}
+  else if(e.key==='End'){e.preventDefault();go(slides.length-1);}
+  else if(e.key==='r'||e.key==='R'){slides[current()].querySelectorAll('.spoiler').forEach(s=>s.classList.add('revealed'));}
+});
+document.querySelectorAll('.spoiler').forEach(s=>s.addEventListener('click',()=>s.classList.add('revealed')));
+</script>
+
+</body>
+</html>
