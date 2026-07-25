@@ -141,47 +141,45 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 .reveal:nth-child(6){transition-delay:.40s}
 
 /* ── cover animation ──────────────────────────────────────────────
-   A MergeTree part, drawn honestly: each vertical stack is one column
-   file, each cell one 8192-row granule. Dots drip in at the top (the
-   Kafka engine writing parts), and a scan sweeps down — but only a
-   contiguous band lights, because that is what the ORDER BY buys you.
-   Ingestion on one axis, selective reads on the other: the lesson.  */
-.cover-viz{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;
-  display:flex;align-items:center;justify-content:flex-end;
-  padding-right:clamp(0.8rem,5vw,4.5rem);
-  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 48%,#000 90%,transparent 100%);
-          mask-image:linear-gradient(90deg,transparent 0,#000 48%,#000 90%,transparent 100%)}
-.cv-grid{position:relative;display:flex;gap:clamp(5px,0.9vw,12px)}
-.cv-col{display:flex;flex-direction:column;gap:clamp(3px,0.45vh,5px)}
-
-/* the feed: one dot per column file, dripping in on a faster cycle */
-.cv-feed{width:100%;height:clamp(5px,0.7vh,7px);border-radius:50%;background:var(--gold);
-  opacity:0;animation:cvFeed 2.6s linear infinite;animation-delay:var(--fd)}
-@keyframes cvFeed{0%{opacity:0;transform:translateY(-9px)}
-  18%{opacity:.85;transform:translateY(0)}55%{opacity:.18}100%{opacity:.10}}
-
-/* every granule dims by default and brightens as the scan reaches its row */
-.cv-cell{width:clamp(14px,2.1vw,28px);height:clamp(6px,0.8vh,10px);border-radius:2px;
+   A MergeTree part laid out the way it is actually stored: five
+   horizontal lanes, one per column file of `events`, running left to
+   right along the ORDER BY key, and each vertical slice is one 8192-row
+   granule. New granules pulse at the right-hand head, because
+   time-ordered data appends there. A scan sweeps across, but only a
+   contiguous slice lights — that is what the sort key buys you.
+   Lives in the bottom margin, clear of the title.                  */
+.cover-viz{position:absolute;left:0;right:0;bottom:clamp(1rem,4.5vh,3rem);z-index:0;
+  display:flex;justify-content:center;pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 11%,#000 89%,transparent 100%);
+          mask-image:linear-gradient(90deg,transparent 0,#000 11%,#000 89%,transparent 100%)}
+.cv-grid{position:relative;width:min(86vw,1440px);
+  display:flex;flex-direction:column;gap:clamp(3px,0.5vh,6px)}
+.cv-row{display:flex;gap:clamp(2px,0.32vw,5px)}
+.cv-cell{flex:1;height:clamp(7px,1.05vh,13px);border-radius:2px;
   background:var(--gold);opacity:.07;
-  animation:cvPass 9s linear infinite;animation-delay:var(--rd)}
-@keyframes cvPass{0%{opacity:.07}3%{opacity:.20}11%{opacity:.07}100%{opacity:.07}}
+  animation:cvPass 9s linear infinite;animation-delay:var(--cd)}
+@keyframes cvPass{0%{opacity:.07}3%{opacity:.17}11%{opacity:.07}100%{opacity:.07}}
 
-/* the selected band — the granules the primary index did not skip */
-.cv-cell.hit{animation:cvHit 9s linear infinite;animation-delay:var(--rd)}
+/* the granules the primary index did not skip */
+.cv-cell.hit{animation:cvHit 9s linear infinite;animation-delay:var(--cd)}
 @keyframes cvHit{0%{opacity:.07;box-shadow:none}
-  3%{opacity:1;box-shadow:0 0 12px rgba(212,165,116,.75)}
-  30%{opacity:.92;box-shadow:0 0 7px rgba(212,165,116,.45)}
-  55%{opacity:.10;box-shadow:none}100%{opacity:.07;box-shadow:none}}
+  3%{opacity:.95;box-shadow:0 0 14px rgba(212,165,116,.55)}
+  32%{opacity:.72;box-shadow:0 0 9px rgba(212,165,116,.30)}
+  58%{opacity:.10;box-shadow:none}100%{opacity:.07;box-shadow:none}}
 
-.cv-scan{position:absolute;left:-6%;width:112%;height:2px;top:0;
-  background:linear-gradient(90deg,transparent,var(--red),transparent);
-  opacity:.5;animation:cvScan 9s linear infinite}
-@keyframes cvScan{0%{top:0;opacity:0}4%{opacity:.55}92%{opacity:.5}100%{top:100%;opacity:0}}
+/* the head of the sort key: new granules landing as Kafka writes */
+.cv-cell.head{animation:cvHead 2.6s linear infinite;animation-delay:var(--hd)}
+@keyframes cvHead{0%{opacity:.06}20%{opacity:.50}70%{opacity:.14}100%{opacity:.06}}
+
+.cv-scan{position:absolute;top:-10%;height:120%;width:2px;left:0;
+  background:linear-gradient(180deg,transparent,var(--red),transparent);
+  opacity:.45;animation:cvScan 9s linear infinite}
+@keyframes cvScan{0%{left:0;opacity:0}4%{opacity:.50}92%{opacity:.45}100%{left:100%;opacity:0}}
 
 @media (prefers-reduced-motion:reduce){
-  .cv-cell,.cv-cell.hit,.cv-feed,.cv-scan{animation:none}
-  .cv-cell{opacity:.09}.cv-cell.hit{opacity:.85}.cv-feed{opacity:.5}.cv-scan{top:46%;opacity:.4}}
-@media (max-height:600px){.cover-viz{display:none}}
+  .cv-cell,.cv-cell.hit,.cv-cell.head,.cv-scan{animation:none}
+  .cv-cell{opacity:.08}.cv-cell.hit{opacity:.70}.cv-scan{left:46%;opacity:.40}}
+@media (max-height:640px),(max-width:900px){.cover-viz{display:none}}
 
 /* prediction spoilers — blurred until click or R (convention from L5 onward) */
 .spoiler{position:relative;cursor:pointer}
@@ -210,100 +208,155 @@ h2 em.hot,h1 em.hot{color:var(--red)}
   <div class="cover-viz" aria-hidden="true">
     <div class="cv-grid">
       <div class="cv-scan"></div>
-      <div class="cv-col" title="event_time">
-        <div class="cv-feed" style="--fd:0.00s"></div>
-        <div class="cv-cell" style="--rd:0.000s"></div>
-        <div class="cv-cell" style="--rd:0.562s"></div>
-        <div class="cv-cell" style="--rd:1.125s"></div>
-        <div class="cv-cell" style="--rd:1.688s"></div>
-        <div class="cv-cell" style="--rd:2.250s"></div>
-        <div class="cv-cell" style="--rd:2.812s"></div>
-        <div class="cv-cell" style="--rd:3.375s"></div>
-        <div class="cv-cell hit" style="--rd:3.938s"></div>
-        <div class="cv-cell hit" style="--rd:4.500s"></div>
-        <div class="cv-cell" style="--rd:5.062s"></div>
-        <div class="cv-cell" style="--rd:5.625s"></div>
-        <div class="cv-cell" style="--rd:6.188s"></div>
-        <div class="cv-cell" style="--rd:6.750s"></div>
-        <div class="cv-cell" style="--rd:7.312s"></div>
-        <div class="cv-cell" style="--rd:7.875s"></div>
-        <div class="cv-cell" style="--rd:8.438s"></div>
+      <div class="cv-row" title="event_time">
+        <div class="cv-cell" style="--cd:0.000s"></div>
+        <div class="cv-cell" style="--cd:0.321s"></div>
+        <div class="cv-cell" style="--cd:0.643s"></div>
+        <div class="cv-cell" style="--cd:0.964s"></div>
+        <div class="cv-cell" style="--cd:1.286s"></div>
+        <div class="cv-cell" style="--cd:1.607s"></div>
+        <div class="cv-cell" style="--cd:1.929s"></div>
+        <div class="cv-cell" style="--cd:2.250s"></div>
+        <div class="cv-cell" style="--cd:2.571s"></div>
+        <div class="cv-cell" style="--cd:2.893s"></div>
+        <div class="cv-cell" style="--cd:3.214s"></div>
+        <div class="cv-cell" style="--cd:3.536s"></div>
+        <div class="cv-cell" style="--cd:3.857s"></div>
+        <div class="cv-cell" style="--cd:4.179s"></div>
+        <div class="cv-cell" style="--cd:4.500s"></div>
+        <div class="cv-cell" style="--cd:4.821s"></div>
+        <div class="cv-cell" style="--cd:5.143s"></div>
+        <div class="cv-cell hit" style="--cd:5.464s"></div>
+        <div class="cv-cell hit" style="--cd:5.786s"></div>
+        <div class="cv-cell" style="--cd:6.107s"></div>
+        <div class="cv-cell" style="--cd:6.429s"></div>
+        <div class="cv-cell" style="--cd:6.750s"></div>
+        <div class="cv-cell" style="--cd:7.071s"></div>
+        <div class="cv-cell" style="--cd:7.393s"></div>
+        <div class="cv-cell" style="--cd:7.714s"></div>
+        <div class="cv-cell" style="--cd:8.036s"></div>
+        <div class="cv-cell" style="--cd:8.357s"></div>
+        <div class="cv-cell head" style="--hd:0.00s"></div>
       </div>
-      <div class="cv-col" title="user_id">
-        <div class="cv-feed" style="--fd:0.22s"></div>
-        <div class="cv-cell" style="--rd:0.000s"></div>
-        <div class="cv-cell" style="--rd:0.562s"></div>
-        <div class="cv-cell" style="--rd:1.125s"></div>
-        <div class="cv-cell" style="--rd:1.688s"></div>
-        <div class="cv-cell" style="--rd:2.250s"></div>
-        <div class="cv-cell" style="--rd:2.812s"></div>
-        <div class="cv-cell" style="--rd:3.375s"></div>
-        <div class="cv-cell hit" style="--rd:3.938s"></div>
-        <div class="cv-cell hit" style="--rd:4.500s"></div>
-        <div class="cv-cell" style="--rd:5.062s"></div>
-        <div class="cv-cell" style="--rd:5.625s"></div>
-        <div class="cv-cell" style="--rd:6.188s"></div>
-        <div class="cv-cell" style="--rd:6.750s"></div>
-        <div class="cv-cell" style="--rd:7.312s"></div>
-        <div class="cv-cell" style="--rd:7.875s"></div>
-        <div class="cv-cell" style="--rd:8.438s"></div>
+      <div class="cv-row" title="user_id">
+        <div class="cv-cell" style="--cd:0.000s"></div>
+        <div class="cv-cell" style="--cd:0.321s"></div>
+        <div class="cv-cell" style="--cd:0.643s"></div>
+        <div class="cv-cell" style="--cd:0.964s"></div>
+        <div class="cv-cell" style="--cd:1.286s"></div>
+        <div class="cv-cell" style="--cd:1.607s"></div>
+        <div class="cv-cell" style="--cd:1.929s"></div>
+        <div class="cv-cell" style="--cd:2.250s"></div>
+        <div class="cv-cell" style="--cd:2.571s"></div>
+        <div class="cv-cell" style="--cd:2.893s"></div>
+        <div class="cv-cell" style="--cd:3.214s"></div>
+        <div class="cv-cell" style="--cd:3.536s"></div>
+        <div class="cv-cell" style="--cd:3.857s"></div>
+        <div class="cv-cell" style="--cd:4.179s"></div>
+        <div class="cv-cell" style="--cd:4.500s"></div>
+        <div class="cv-cell" style="--cd:4.821s"></div>
+        <div class="cv-cell" style="--cd:5.143s"></div>
+        <div class="cv-cell hit" style="--cd:5.464s"></div>
+        <div class="cv-cell hit" style="--cd:5.786s"></div>
+        <div class="cv-cell" style="--cd:6.107s"></div>
+        <div class="cv-cell" style="--cd:6.429s"></div>
+        <div class="cv-cell" style="--cd:6.750s"></div>
+        <div class="cv-cell" style="--cd:7.071s"></div>
+        <div class="cv-cell" style="--cd:7.393s"></div>
+        <div class="cv-cell" style="--cd:7.714s"></div>
+        <div class="cv-cell" style="--cd:8.036s"></div>
+        <div class="cv-cell" style="--cd:8.357s"></div>
+        <div class="cv-cell head" style="--hd:0.12s"></div>
       </div>
-      <div class="cv-col" title="event_type">
-        <div class="cv-feed" style="--fd:0.44s"></div>
-        <div class="cv-cell" style="--rd:0.000s"></div>
-        <div class="cv-cell" style="--rd:0.562s"></div>
-        <div class="cv-cell" style="--rd:1.125s"></div>
-        <div class="cv-cell" style="--rd:1.688s"></div>
-        <div class="cv-cell" style="--rd:2.250s"></div>
-        <div class="cv-cell" style="--rd:2.812s"></div>
-        <div class="cv-cell" style="--rd:3.375s"></div>
-        <div class="cv-cell hit" style="--rd:3.938s"></div>
-        <div class="cv-cell hit" style="--rd:4.500s"></div>
-        <div class="cv-cell" style="--rd:5.062s"></div>
-        <div class="cv-cell" style="--rd:5.625s"></div>
-        <div class="cv-cell" style="--rd:6.188s"></div>
-        <div class="cv-cell" style="--rd:6.750s"></div>
-        <div class="cv-cell" style="--rd:7.312s"></div>
-        <div class="cv-cell" style="--rd:7.875s"></div>
-        <div class="cv-cell" style="--rd:8.438s"></div>
+      <div class="cv-row" title="event_type">
+        <div class="cv-cell" style="--cd:0.000s"></div>
+        <div class="cv-cell" style="--cd:0.321s"></div>
+        <div class="cv-cell" style="--cd:0.643s"></div>
+        <div class="cv-cell" style="--cd:0.964s"></div>
+        <div class="cv-cell" style="--cd:1.286s"></div>
+        <div class="cv-cell" style="--cd:1.607s"></div>
+        <div class="cv-cell" style="--cd:1.929s"></div>
+        <div class="cv-cell" style="--cd:2.250s"></div>
+        <div class="cv-cell" style="--cd:2.571s"></div>
+        <div class="cv-cell" style="--cd:2.893s"></div>
+        <div class="cv-cell" style="--cd:3.214s"></div>
+        <div class="cv-cell" style="--cd:3.536s"></div>
+        <div class="cv-cell" style="--cd:3.857s"></div>
+        <div class="cv-cell" style="--cd:4.179s"></div>
+        <div class="cv-cell" style="--cd:4.500s"></div>
+        <div class="cv-cell" style="--cd:4.821s"></div>
+        <div class="cv-cell" style="--cd:5.143s"></div>
+        <div class="cv-cell hit" style="--cd:5.464s"></div>
+        <div class="cv-cell hit" style="--cd:5.786s"></div>
+        <div class="cv-cell" style="--cd:6.107s"></div>
+        <div class="cv-cell" style="--cd:6.429s"></div>
+        <div class="cv-cell" style="--cd:6.750s"></div>
+        <div class="cv-cell" style="--cd:7.071s"></div>
+        <div class="cv-cell" style="--cd:7.393s"></div>
+        <div class="cv-cell" style="--cd:7.714s"></div>
+        <div class="cv-cell" style="--cd:8.036s"></div>
+        <div class="cv-cell" style="--cd:8.357s"></div>
+        <div class="cv-cell head" style="--hd:0.24s"></div>
       </div>
-      <div class="cv-col" title="amount">
-        <div class="cv-feed" style="--fd:0.66s"></div>
-        <div class="cv-cell" style="--rd:0.000s"></div>
-        <div class="cv-cell" style="--rd:0.562s"></div>
-        <div class="cv-cell" style="--rd:1.125s"></div>
-        <div class="cv-cell" style="--rd:1.688s"></div>
-        <div class="cv-cell" style="--rd:2.250s"></div>
-        <div class="cv-cell" style="--rd:2.812s"></div>
-        <div class="cv-cell" style="--rd:3.375s"></div>
-        <div class="cv-cell hit" style="--rd:3.938s"></div>
-        <div class="cv-cell hit" style="--rd:4.500s"></div>
-        <div class="cv-cell" style="--rd:5.062s"></div>
-        <div class="cv-cell" style="--rd:5.625s"></div>
-        <div class="cv-cell" style="--rd:6.188s"></div>
-        <div class="cv-cell" style="--rd:6.750s"></div>
-        <div class="cv-cell" style="--rd:7.312s"></div>
-        <div class="cv-cell" style="--rd:7.875s"></div>
-        <div class="cv-cell" style="--rd:8.438s"></div>
+      <div class="cv-row" title="amount">
+        <div class="cv-cell" style="--cd:0.000s"></div>
+        <div class="cv-cell" style="--cd:0.321s"></div>
+        <div class="cv-cell" style="--cd:0.643s"></div>
+        <div class="cv-cell" style="--cd:0.964s"></div>
+        <div class="cv-cell" style="--cd:1.286s"></div>
+        <div class="cv-cell" style="--cd:1.607s"></div>
+        <div class="cv-cell" style="--cd:1.929s"></div>
+        <div class="cv-cell" style="--cd:2.250s"></div>
+        <div class="cv-cell" style="--cd:2.571s"></div>
+        <div class="cv-cell" style="--cd:2.893s"></div>
+        <div class="cv-cell" style="--cd:3.214s"></div>
+        <div class="cv-cell" style="--cd:3.536s"></div>
+        <div class="cv-cell" style="--cd:3.857s"></div>
+        <div class="cv-cell" style="--cd:4.179s"></div>
+        <div class="cv-cell" style="--cd:4.500s"></div>
+        <div class="cv-cell" style="--cd:4.821s"></div>
+        <div class="cv-cell" style="--cd:5.143s"></div>
+        <div class="cv-cell hit" style="--cd:5.464s"></div>
+        <div class="cv-cell hit" style="--cd:5.786s"></div>
+        <div class="cv-cell" style="--cd:6.107s"></div>
+        <div class="cv-cell" style="--cd:6.429s"></div>
+        <div class="cv-cell" style="--cd:6.750s"></div>
+        <div class="cv-cell" style="--cd:7.071s"></div>
+        <div class="cv-cell" style="--cd:7.393s"></div>
+        <div class="cv-cell" style="--cd:7.714s"></div>
+        <div class="cv-cell" style="--cd:8.036s"></div>
+        <div class="cv-cell" style="--cd:8.357s"></div>
+        <div class="cv-cell head" style="--hd:0.36s"></div>
       </div>
-      <div class="cv-col" title="region">
-        <div class="cv-feed" style="--fd:0.88s"></div>
-        <div class="cv-cell" style="--rd:0.000s"></div>
-        <div class="cv-cell" style="--rd:0.562s"></div>
-        <div class="cv-cell" style="--rd:1.125s"></div>
-        <div class="cv-cell" style="--rd:1.688s"></div>
-        <div class="cv-cell" style="--rd:2.250s"></div>
-        <div class="cv-cell" style="--rd:2.812s"></div>
-        <div class="cv-cell" style="--rd:3.375s"></div>
-        <div class="cv-cell hit" style="--rd:3.938s"></div>
-        <div class="cv-cell hit" style="--rd:4.500s"></div>
-        <div class="cv-cell" style="--rd:5.062s"></div>
-        <div class="cv-cell" style="--rd:5.625s"></div>
-        <div class="cv-cell" style="--rd:6.188s"></div>
-        <div class="cv-cell" style="--rd:6.750s"></div>
-        <div class="cv-cell" style="--rd:7.312s"></div>
-        <div class="cv-cell" style="--rd:7.875s"></div>
-        <div class="cv-cell" style="--rd:8.438s"></div>
+      <div class="cv-row" title="region">
+        <div class="cv-cell" style="--cd:0.000s"></div>
+        <div class="cv-cell" style="--cd:0.321s"></div>
+        <div class="cv-cell" style="--cd:0.643s"></div>
+        <div class="cv-cell" style="--cd:0.964s"></div>
+        <div class="cv-cell" style="--cd:1.286s"></div>
+        <div class="cv-cell" style="--cd:1.607s"></div>
+        <div class="cv-cell" style="--cd:1.929s"></div>
+        <div class="cv-cell" style="--cd:2.250s"></div>
+        <div class="cv-cell" style="--cd:2.571s"></div>
+        <div class="cv-cell" style="--cd:2.893s"></div>
+        <div class="cv-cell" style="--cd:3.214s"></div>
+        <div class="cv-cell" style="--cd:3.536s"></div>
+        <div class="cv-cell" style="--cd:3.857s"></div>
+        <div class="cv-cell" style="--cd:4.179s"></div>
+        <div class="cv-cell" style="--cd:4.500s"></div>
+        <div class="cv-cell" style="--cd:4.821s"></div>
+        <div class="cv-cell" style="--cd:5.143s"></div>
+        <div class="cv-cell hit" style="--cd:5.464s"></div>
+        <div class="cv-cell hit" style="--cd:5.786s"></div>
+        <div class="cv-cell" style="--cd:6.107s"></div>
+        <div class="cv-cell" style="--cd:6.429s"></div>
+        <div class="cv-cell" style="--cd:6.750s"></div>
+        <div class="cv-cell" style="--cd:7.071s"></div>
+        <div class="cv-cell" style="--cd:7.393s"></div>
+        <div class="cv-cell" style="--cd:7.714s"></div>
+        <div class="cv-cell" style="--cd:8.036s"></div>
+        <div class="cv-cell" style="--cd:8.357s"></div>
+        <div class="cv-cell head" style="--hd:0.48s"></div>
       </div>
     </div>
   </div>
@@ -878,14 +931,14 @@ WHERE event_type='purchase' AND region='eu'
     <div class="spoiler reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
       <div class="code-block">
         <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">measure_freshness.py --runs 10</span></div>
-        <div class="code-body">  run 01: 0.10s
-  run 02: 0.01s
+        <div class="code-body">  run 01: 0.16s
+  run 02: 1.03s
   ...
 
-  min:  0.01s
-  p50:  0.05s
-  p95:  1.06s
-  max:  1.06s</div>
+  min:  0.16s
+  p50:  1.01s
+  p95:  1.14s
+  max:  1.14s</div>
       </div>
     </div>
   </div>
@@ -917,7 +970,7 @@ WHERE event_type='purchase' AND region='eu'
     </div>
     <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
       <div class="ico" style="color:var(--red)">!</div>
-      <div class="ctxt"><strong>One canary never fills a block of any size</strong> — so the block size cannot be what ends the batch. The flush timer is. Block size only binds once the stream is fast enough to fill a block before the timer fires, which is why the same canary under a 1000/s producer arrives in <span class="ink-mono">0.05s</span>. Which knob matters depends on your arrival rate.</div>
+      <div class="ctxt"><strong>One canary never fills a block of any size</strong> — so the block size cannot be what ends the batch. The flush timer is. Block size only binds once the stream is fast enough to fill a block before the timer fires, and a 1000/s producer is <em>not</em> fast enough: a 1000-row block takes ~1s to fill, the same as the timer, so the two tie and freshness stays around <span class="ink-mono">1.0s</span>. At 20 000/s the block fills in ~50ms and p50 drops to <span class="ink-mono">0.14s</span>. Which knob matters depends on your arrival rate.</div>
     </div>
   </div>
 </section>

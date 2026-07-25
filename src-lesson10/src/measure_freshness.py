@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import json
+import random
 import statistics
 import time
 from datetime import UTC, datetime
@@ -17,9 +18,18 @@ from confluent_kafka import Producer
 
 from config import BOOTSTRAP, EVENTS_TOPIC, banner, get_ch_client
 
+# Canary ids must be unique per invocation. With a fixed base, run N of the
+# second invocation reuses the id that run N of the first invocation already
+# inserted, so the very first SELECT matches a leftover row and every
+# measurement after the first reports the query round-trip (~0.01s) instead of
+# the ingestion latency. The nonce keeps ids inside UInt32 and well above the
+# 1..100,000 range the producer uses for real users.
+CANARY_BASE = 900_000_000
+RUN_NONCE = random.randrange(100_000) * 1_000
+
 
 def measure_one(client, producer, run_id: int) -> float:
-    canary_id = 900_000_000 + run_id
+    canary_id = CANARY_BASE + RUN_NONCE + run_id
     canary_time = datetime.now(UTC)
     event = {
         "event_time": canary_time.isoformat(),

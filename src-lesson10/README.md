@@ -84,14 +84,21 @@ Send canary events and measure how long until they are queryable:
 uv run python src/measure_freshness.py --runs 10
 ```
 
-Measured on a laptop, this depends entirely on whether the producer is running:
+Measured on a laptop, this depends on whether the arrival rate is high enough to
+fill a block before the flush timer fires:
 
 | Topic state | p50 | p95 |
 |---|---|---|
 | idle (canaries only) | ~1.5 s | ~1.6 s |
-| under a 1000/s producer | 0.05 s | 1.06 s |
+| under a 1 000/s producer | ~1.0 s | ~1.1 s |
+| under a 20 000/s producer | ~0.14 s | ~0.19 s |
 
-That 30x gap is the lesson, and `demo_ingest_floor.py` isolates why:
+Note the middle row. `kafka_max_block_size` is 1 000, so at 1 000 events/s a block
+takes about a second to fill — the same as `kafka_flush_interval_ms`. The two
+knobs tie and freshness barely improves over an idle topic. Only at 20 000/s does
+the block fill in ~50 ms and the latency collapse by 10x.
+
+That is the lesson, and `demo_ingest_floor.py` isolates why:
 
 ```bash
 uv run python src/demo_ingest_floor.py

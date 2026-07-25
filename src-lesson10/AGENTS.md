@@ -29,6 +29,10 @@ ingestion latency, query latency under concurrent load, the effect of the
 - `src/app.py` — FastAPI with three endpoints (`/api/revenue`, `/api/throughput`,
   `/api/top-users`). Fully implemented; students should read and tweak queries.
 - `src/measure_freshness.py` — canary-event ingestion latency distribution.
+  Canary `user_id`s carry a per-invocation random nonce; a fixed base would let
+  run N match the row run N of a previous invocation already inserted, and every
+  measurement after the first would report the SELECT round-trip (~0.01s)
+  instead of the real ingestion latency.
 - `src/query_loadtest.py` — concurrent HTTP load test.
 - `src/compare_duckdb.py` — export recent events to Parquet, query DuckDB vs.
   ClickHouse raw table.
@@ -101,9 +105,10 @@ ingestion latency, query latency under concurrent load, the effect of the
 
 1. `docker compose up -d`
 2. `uv run python src/setup_topics.py --reset`
-3. `uv run python src/setup_clickhouse.py --reset` — must print all 8
-   `running:` lines and `ClickHouse schema is ready.` If it stops early, a
-   statement was rejected and the schema is half-created.
+3. `uv run python src/setup_clickhouse.py --reset` — must print 7 `DROP`
+   + 7 `CREATE` `running:` lines (14 total; 7 without `--reset`) and
+   `ClickHouse schema is ready.` If it stops early, a statement was rejected
+   and the schema is half-created.
 4. `uv run python src/seed_bulk.py` — ~20M rows, ~2 440 granules, ~4 seconds.
 5. `uv run python src/producer.py --rate 1000 --duration-seconds 120 &`
 6. `uv run uvicorn src.app:app --host 0.0.0.0 --port 8000 &`
@@ -117,8 +122,11 @@ ingestion latency, query latency under concurrent load, the effect of the
    All return JSON with `query_ms` and non-empty `rows`. Expect roughly
    4 / 37 / 20 / 9 ms — the `unique_users=true` variant being ~9x the plain one
    is the intended result, not a regression.
-8. `uv run python src/measure_freshness.py --runs 10` — p50 ~0.05s while the
-   producer runs, ~1.5s on an idle topic. Both are correct; the gap is the point.
+8. `uv run python src/measure_freshness.py --runs 10` — ~1.5s on an idle topic,
+   ~1.0s under a 1 000/s producer, ~0.14s under a 20 000/s producer. At 1 000/s
+   the block-fill time and `kafka_flush_interval_ms` both land at ~1s, so the
+   two knobs tie; the collapse only appears once the rate fills a 1 000-row
+   block well inside the timer.
 9. `uv run python src/query_loadtest.py --endpoint "http://localhost:8000/api/revenue?minutes=10" --clients 10` should report p50 < 20 ms.
 10. Each `demo_*.py` runs standalone and cleans up after itself.
 

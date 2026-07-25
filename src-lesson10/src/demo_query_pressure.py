@@ -24,12 +24,10 @@ def producer_loop(rate: int, stop: threading.Event):
 
     producer = Producer({"bootstrap.servers": BOOTSTRAP})
     interval = 1.0 / rate
-    order_id = 1_000_000
     while not stop.is_set():
-        event = make_event(order_id)
+        event = make_event()
         producer.produce(EVENTS_TOPIC, json.dumps(event).encode("utf-8"))
         producer.poll(0)
-        order_id += 1
         time.sleep(interval)
     producer.flush()
 
