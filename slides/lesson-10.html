@@ -67,7 +67,9 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 .bullets.hot li::before{color:var(--red)}
 .bullets li strong{font-weight:600}
 
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);flex:1;min-height:0}
+/* No flex-grow: a stretching grid eats the free space that .slide-content's
+   justify-content:center needs, which pins the block to the top of the slide. */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);flex:0 1 auto;min-height:0}
 @media(max-width:700px){.two-col{grid-template-columns:1fr}}
 .col{display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.55rem);min-height:0}
 .col-label{font-family:var(--mono);font-size:clamp(0.55rem,0.85vw,0.68rem);font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
@@ -104,6 +106,27 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 
 .arch{font-family:var(--mono);font-size:clamp(0.5rem,0.82vw,0.66rem);color:var(--soft);line-height:1.5;white-space:pre;
   background:var(--panel);border:1px solid var(--panel2);border-radius:6px;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(0.9rem,1.6vw,1.3rem);overflow:hidden}
+
+/* ── SVG diagrams ──────────────────────────────────────────────────────────
+   Scale with the slide via viewBox; all type is Space Mono to match .arch.
+   Shared vocabulary: .dia-box = a stored thing, .dia-hit = the thing the
+   engine actually reads, .dia-skip = what it skipped, .dia-flow = movement. */
+/* max-height keeps a tall diagram from pushing bullets out of a short slide:
+   the viewBox scales down and centres rather than the slide clipping. */
+.svg-dia{display:block;width:100%;height:auto;max-height:40vh;background:var(--panel);
+  border:1px solid var(--panel2);border-radius:6px}
+.svg-dia text{font-family:var(--mono);fill:var(--soft)}
+.svg-dia .dia-lbl{font-size:11px;fill:var(--muted);letter-spacing:0.09em}
+.svg-dia .dia-cap{font-size:11px;fill:var(--muted)}
+.svg-dia .dia-val{font-size:12px;fill:var(--soft)}
+.svg-dia .dia-key{font-size:12px;fill:var(--gold)}
+.svg-dia .dia-box{fill:var(--panel2);stroke:rgba(212,165,116,0.20);stroke-width:1}
+.svg-dia .dia-hit{fill:rgba(212,165,116,0.20);stroke:var(--gold);stroke-width:1.5}
+.svg-dia .dia-skip{fill:var(--panel2);stroke:rgba(245,242,235,0.07);stroke-width:1}
+.svg-dia .dia-flow{stroke:rgba(212,165,116,0.45);stroke-width:1.5;fill:none}
+.svg-dia .dia-tick{stroke:rgba(245,242,235,0.13);stroke-width:1}
+.svg-dia .dia-hot{fill:var(--red)}
+.svg-dia .dia-hot-s{stroke:var(--red);stroke-width:1.5;fill:none}
 
 .dtable{width:100%;border-collapse:collapse}
 .dtable th,.dtable td{font-family:var(--sans);font-size:clamp(0.62rem,1.05vw,0.84rem);
@@ -194,6 +217,19 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 .geo-circle{top:8%;right:6%;width:min(30vw,280px);height:min(30vw,280px);border:2px solid rgba(245,242,235,0.10);border-radius:50%}
 .geo-dot{bottom:10%;left:5%;width:12px;height:12px;background:var(--red);border-radius:50%;opacity:0.7}
 .geo-line{bottom:18%;left:8%;width:clamp(60px,12vw,140px);height:1px;background:rgba(245,242,235,0.10)}
+
+/* break timer on the Break 01 slide */
+.timer{display:flex;flex-direction:column;align-items:center;gap:0.9rem;margin-top:clamp(1.2rem,2.5vh,2rem)}
+.timer-face{cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:0.35rem;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(1.2rem,2vw,2rem);background:var(--panel);border:1px solid var(--gold-dim);border-radius:8px;transition:border-color .2s,box-shadow .2s}
+.timer-face:hover{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.timer-disp{font-family:var(--mono);font-size:clamp(2.2rem,5.5vw,4.2rem);font-weight:700;color:var(--gold);line-height:1}
+.timer-hint{font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.65rem);text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)}
+.timer-controls{display:flex;gap:0.6rem}
+.timer-btn{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:0.55em 1.1em;border:1px solid var(--gold-dim);background:var(--panel);color:var(--text);border-radius:4px;cursor:pointer;transition:background .15s,border-color .15s}
+.timer-btn:hover{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
+.timer.running .timer-disp{color:var(--text)}
+.timer.done .timer-disp{color:var(--red);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}html{scroll-behavior:auto}}
 @media (max-height:600px){.geo-circle,.kbd-hint{display:none}.sub{font-size:clamp(0.75rem,1.4vw,1rem)}h1{font-size:clamp(1.8rem,6vw,3rem)}h2{font-size:clamp(1.1rem,3vw,1.8rem)}}
@@ -410,7 +446,7 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 <section class="slide" id="s04" data-speaker="Set up the core tension. Fast queries want precomputed answers; fresh data wants raw events. You cannot fully have both.">
   <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
     <div class="section-marker reveal">the tension</div>
-    <p class="big-q reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Where do analytical results live, and how do you serve them fast enough?</p>
+    <p class="big-q reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Fast queries want precomputed answers; fresh data wants raw events. You cannot fully have both.</p>
     <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
       <div class="col">
         <p class="col-label" style="color:var(--gold)">Fast query</p>
@@ -429,6 +465,20 @@ h2 em.hot,h1 em.hot{color:var(--red)}
           <li>You need an engine fast enough to scan millions of rows in milliseconds.</li>
           <li>The faster the raw scan, the less pre-aggregation you need.</li>
         </ul>
+      </div>
+    </div>
+    <div class="two-col reveal" style="margin-top:clamp(0.6rem,1.3vh,1rem)">
+      <div class="col">
+        <div class="callout note" style="border-color:var(--gold-dim)">
+          <div class="ico" style="color:var(--gold)">&#9432;</div>
+          <div class="ctxt"><strong>In the wild:</strong> a leaderboard cache, an hourly sales dashboard, a "top products this week" widget — all pre-computed, all wrong the instant something changes underneath them.</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="callout note" style="border-color:var(--red-dim)">
+          <div class="ico" style="color:var(--red)">&#9432;</div>
+          <div class="ctxt"><strong>In the wild:</strong> a fraud investigator's ad-hoc query, a "why did revenue spike at 2pm" drill-down — questions nobody anticipated, answered from raw events.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -509,7 +559,7 @@ h2 em.hot,h1 em.hot{color:var(--red)}
         <tr><th>Column</th><th>Shape</th><th class="num">Ratio</th></tr>
         <tr><td class="cool">region</td><td>LowCardinality, ~5 distinct values</td><td class="num">212.9x</td></tr>
         <tr><td class="cool">event_time</td><td>DateTime64, sorted only within each group</td><td class="num">2.2x</td></tr>
-        <tr><td class="cool">amount</td><td>Decimal, high entropy</td><td class="num">2.4x</td></tr>
+        <tr><td class="cool">amount</td><td>Decimal, high entropy</td><td class="num">1.4x</td></tr>
       </table>
     </div>
     <div class="callout note reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
@@ -573,17 +623,58 @@ h2 em.hot,h1 em.hot{color:var(--red)}
   <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
     <div class="section-marker reveal">the callback</div>
     <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">MergeTree is an LSM tree</h2>
-    <div class="arch reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
-Incoming data  ──▶  in-memory buffer / small part on disk
-                       │
-                       ▼
-                immutable part (column files + sparse index)
-                       │
-                       ▼
-             background merges: compact, re-sort, compress
-                       │
-                       ▼
-              fewer, larger parts → fast scans</div>
+    <div class="reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
+      <svg class="svg-dia" viewBox="0 0 980 350" role="img" aria-label="Each insert batch lands as its own immutable part. Background merges compact many small parts into fewer, larger ones, so a row is rewritten several times on its way down.">
+        <defs>
+          <marker id="lsmArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="rgba(212,165,116,0.55)"/>
+          </marker>
+        </defs>
+
+        <!-- inserts raining onto L0: one part per Kafka block -->
+        <text class="dia-lbl" x="150" y="22">INSERT BATCHES</text>
+        <g class="dia-flow" marker-end="url(#lsmArrow)">
+          <path d="M180 32 V54"/><path d="M249 32 V54"/><path d="M318 32 V54"/>
+          <path d="M387 32 V54"/><path d="M456 32 V54"/><path d="M525 32 V54"/>
+        </g>
+
+        <!-- L0 · one small part per batch -->
+        <text class="dia-lbl" x="20" y="84">L0 · NEW</text>
+        <g class="dia-box">
+          <rect x="150" y="62" width="61" height="34" rx="3"/>
+          <rect x="219" y="62" width="61" height="34" rx="3"/>
+          <rect x="288" y="62" width="61" height="34" rx="3"/>
+          <rect x="357" y="62" width="61" height="34" rx="3"/>
+          <rect x="426" y="62" width="61" height="34" rx="3"/>
+          <rect x="495" y="62" width="61" height="34" rx="3"/>
+        </g>
+        <path class="dia-flow" d="M355 100 V150" marker-end="url(#lsmArrow)"/>
+
+        <!-- L1 · merged -->
+        <text class="dia-lbl" x="20" y="180">L1 · MERGED</text>
+        <g class="dia-box">
+          <rect x="150" y="158" width="131" height="34" rx="3"/>
+          <rect x="289" y="158" width="131" height="34" rx="3"/>
+          <rect x="428" y="158" width="128" height="34" rx="3"/>
+        </g>
+        <path class="dia-flow" d="M355 196 V246" marker-end="url(#lsmArrow)"/>
+
+        <!-- L2 · one big sorted part: what a scan wants to meet -->
+        <text class="dia-lbl" x="20" y="276">L2 · COMPACT</text>
+        <rect class="dia-hit" x="150" y="254" width="406" height="34" rx="3"/>
+
+        <line class="dia-tick" x1="588" y1="46" x2="588" y2="298"/>
+
+        <text class="dia-key" x="612" y="76">APPEND-ONLY</text>
+        <text class="dia-cap" x="612" y="94">no random I/O, nothing rewritten in place</text>
+        <text class="dia-key" x="612" y="172">BACKGROUND MERGE</text>
+        <text class="dia-cap" x="612" y="190">compact &#183; re-sort &#183; re-compress</text>
+        <text class="dia-key" x="612" y="268">FEWER, LARGER PARTS</text>
+        <text class="dia-cap" x="612" y="286">fast scans, fewer files to open</text>
+
+        <text class="dia-cap dia-hot" x="150" y="326">Cost: a row is rewritten 3-5&#215; on its way down &#8212; write amplification.</text>
+      </svg>
+    </div>
     <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)">
       <li>Writes are append-only: no random I/O, no rewriting existing rows.</li>
       <li>A CDC stream carries updates and deletes (Lesson 5); MergeTree is append-only &mdash; <span class="term">ReplacingMergeTree</span> is how the merge resolves that tension.</li>
@@ -602,16 +693,63 @@ Incoming data  ──▶  in-memory buffer / small part on disk
     <div class="section-marker reveal">the sparse index</div>
     <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.9rem)">ClickHouse does not index <em>every row</em></h2>
     <p class="sub reveal" style="margin-top:0.4rem">One mark per granule &mdash; 8192 rows by default. For 100M rows that's ~12,200 marks; for a billion, ~122,000. Small enough to sit in memory.</p>
-    <div class="arch reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
-primary.idx:  mark0         mark1         mark2         mark3
-              (purchase,eu) (purchase,us) (refund,eu)   (view,us)
-                  │             │             │             │
-                  ▼             ▼             ▼             ▼
-               granule0 ──── granule1 ──── granule2 ──── granule3
-               8192 rows     8192 rows     8192 rows     8192 rows
+    <div class="reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
+      <svg class="svg-dia" viewBox="0 0 980 340" role="img" aria-label="The primary index stores one mark per 8192-row granule, not one entry per row. A filter matching the sort key prefix binary-searches the marks down to a single granule and skips the rest.">
+        <defs>
+          <marker id="idxArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="rgba(212,165,116,0.55)"/>
+          </marker>
+          <marker id="idxArrowDim" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="rgba(245,242,235,0.15)"/>
+          </marker>
+        </defs>
 
-WHERE event_type='purchase' AND region='eu'
-  → binary-search the marks, range = [granule0]  → skip the rest</div>
+        <!-- the index: one entry per granule, so it fits in memory -->
+        <text class="dia-lbl" x="20" y="24">PRIMARY.IDX &#183; ONE MARK PER GRANULE</text>
+        <rect class="dia-hit" x="20" y="36" width="215" height="44" rx="3"/>
+        <text class="dia-lbl" x="34" y="56">mark0</text>
+        <text class="dia-key" x="34" y="72">(purchase, eu)</text>
+        <rect class="dia-box" x="247" y="36" width="215" height="44" rx="3"/>
+        <text class="dia-lbl" x="261" y="56">mark1</text>
+        <text class="dia-val" x="261" y="72">(purchase, us)</text>
+        <rect class="dia-box" x="474" y="36" width="215" height="44" rx="3"/>
+        <text class="dia-lbl" x="488" y="56">mark2</text>
+        <text class="dia-val" x="488" y="72">(refund, eu)</text>
+        <rect class="dia-box" x="701" y="36" width="215" height="44" rx="3"/>
+        <text class="dia-lbl" x="715" y="56">mark3</text>
+        <text class="dia-val" x="715" y="72">(view, us)</text>
+
+        <path class="dia-flow" d="M127 84 V138" marker-end="url(#idxArrow)"/>
+        <g class="dia-flow" stroke="rgba(245,242,235,0.15)" stroke-dasharray="3 4" marker-end="url(#idxArrowDim)">
+          <path d="M354 84 V138"/><path d="M581 84 V138"/><path d="M808 84 V138"/>
+        </g>
+
+        <!-- the data: only the matching granule is actually read -->
+        <rect class="dia-hit" x="20" y="144" width="215" height="52" rx="3"/>
+        <text class="dia-val" x="34" y="166">granule0</text>
+        <text class="dia-cap" x="34" y="184">8192 rows</text>
+        <rect class="dia-skip" x="247" y="144" width="215" height="52" rx="3"/>
+        <text class="dia-cap" x="261" y="166">granule1</text>
+        <text class="dia-cap" x="261" y="184">8192 rows</text>
+        <rect class="dia-skip" x="474" y="144" width="215" height="52" rx="3"/>
+        <text class="dia-cap" x="488" y="166">granule2</text>
+        <text class="dia-cap" x="488" y="184">8192 rows</text>
+        <rect class="dia-skip" x="701" y="144" width="215" height="52" rx="3"/>
+        <text class="dia-cap" x="715" y="166">granule3</text>
+        <text class="dia-cap" x="715" y="184">8192 rows</text>
+
+        <text class="dia-key" x="34" y="218">&#9679; READ</text>
+        <text class="dia-cap dia-hot" x="261" y="218">skipped</text>
+        <text class="dia-cap dia-hot" x="488" y="218">skipped</text>
+        <text class="dia-cap dia-hot" x="715" y="218">skipped</text>
+
+        <line class="dia-tick" x1="20" y1="240" x2="960" y2="240"/>
+
+        <text class="dia-key" x="20" y="268">WHERE event_type='purchase' AND region='eu'</text>
+        <text class="dia-cap" x="20" y="290">binary-search the marks &#8594; range = [granule0] &#8594; skip the rest</text>
+        <text class="dia-cap" x="20" y="320">100M rows = ~12,200 marks. The index describes granules, never rows &#8212; which is why it stays in memory.</text>
+      </svg>
+    </div>
     <ul class="bullets reveal" style="margin-top:clamp(0.5rem,1.1vh,0.8rem)">
       <li>The filter matches the <span class="ink-mono">(event_type, region, event_time)</span> ORDER BY prefix &rarr; matching rows are contiguous &rarr; one bounded range of granules.</li>
       <li>Filter on a column <em>not</em> in that prefix (say, <span class="ink-mono">user_id</span>) &rarr; matches scatter across every granule &rarr; the engine reads them all.</li>
@@ -699,6 +837,16 @@ WHERE event_type='purchase' AND region='eu'
   <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
     <div class="kicker reveal">Break 01</div>
     <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Stretch. <em>Then</em> turn the knobs.</h1>
+    <div class="timer reveal" id="breakTimer" data-seconds="300">
+      <div class="timer-face" id="timerFace">
+        <span class="timer-disp" id="timerDisp">05:00</span>
+        <span class="timer-hint">click to start / pause</span>
+      </div>
+      <div class="timer-controls">
+        <button class="timer-btn" data-add="60" type="button">+1 min</button>
+        <button class="timer-btn" data-add="30" type="button">+30 s</button>
+      </div>
+    </div>
     <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Part two wires the stack up live and tunes the four Kafka settings from the last slide, measuring ingestion latency against query latency as the knobs move.</p>
   </div>
 </section>
@@ -983,6 +1131,16 @@ WHERE event_type='purchase' AND region='eu'
   <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
     <div class="kicker reveal">Break 02</div>
     <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Back in <em>10.</em></h1>
+    <div class="timer reveal" id="breakTimer2" data-seconds="600">
+      <div class="timer-face">
+        <span class="timer-disp">10:00</span>
+        <span class="timer-hint">click to start / pause</span>
+      </div>
+      <div class="timer-controls">
+        <button class="timer-btn" data-add="60" type="button">+1 min</button>
+        <button class="timer-btn" data-add="30" type="button">+30 s</button>
+      </div>
+    </div>
     <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Leave the producer running. Next: query latency under load, diagnosing a slow ClickHouse from system tables, and the ORDER BY payoff.</p>
   </div>
 </section>
@@ -1380,6 +1538,34 @@ document.querySelectorAll('[data-copy]').forEach(block => {
   });
   header.appendChild(btn);
 });
+
+// break timers
+(function(){
+  function fmt(s){
+    const m = Math.floor(s/60).toString().padStart(2,'0');
+    const sec = (s%60).toString().padStart(2,'0');
+    return m+':'+sec;
+  }
+  document.querySelectorAll('.timer').forEach(timer=>{
+    const face = timer.querySelector('.timer-face');
+    const disp = timer.querySelector('.timer-disp');
+    const btns = timer.querySelectorAll('[data-add]');
+    if(!face || !disp) return;
+    let remaining = parseInt(timer.dataset.seconds,10) || 300;
+    let interval = null;
+    let running = false;
+    function update(){ disp.textContent = fmt(remaining); }
+    function tick(){
+      if(remaining>0){ remaining--; update(); }
+      if(remaining<=0){ stop(); timer.classList.add('done'); }
+    }
+    function start(){ if(running) return; running=true; timer.classList.add('running'); interval=setInterval(tick,1000); }
+    function stop(){ running=false; timer.classList.remove('running'); if(interval){ clearInterval(interval); interval=null; } }
+    face.addEventListener('click',()=>{ if(running) stop(); else if(remaining>0) start(); });
+    btns.forEach(b=>b.addEventListener('click',()=>{ remaining += parseInt(b.dataset.add,10); update(); if(!running && remaining>0) start(); }));
+    update();
+  });
+})();
 </script>
 </body>
 </html>
