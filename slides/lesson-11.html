@@ -153,6 +153,16 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 .progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0%;z-index:100;transition:width .2s var(--ease)}
 .kbd-hint{position:fixed;bottom:clamp(0.6rem,1.5vh,1rem);right:clamp(0.8rem,2vw,1.5rem);font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.62rem);color:var(--muted);z-index:100}
 
+.canary-widget{position:fixed;bottom:clamp(0.6rem,1.5vh,1rem);left:clamp(0.8rem,2vw,1.5rem);z-index:100;
+  display:flex;align-items:center;gap:0.5rem;background:var(--panel);border:1px solid var(--gold-dim);
+  border-radius:5px;padding:0.3rem 0.6rem;font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.62rem);color:var(--muted)}
+.canary-widget label{color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;font-weight:700}
+.canary-widget input,.canary-id-input{background:var(--panel2);border:1px solid var(--gold-dim);color:var(--text);
+  font-family:var(--mono);font-size:clamp(0.6rem,0.95vw,0.74rem);border-radius:4px;padding:0.15em 0.5em;width:5em;
+  text-align:center}
+.canary-widget input:focus,.canary-id-input:focus{outline:none;border-color:var(--gold)}
+.canary-id{color:var(--gold);font-weight:700}
+
 /* animations */
 .reveal{opacity:0;transform:translateY(30px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
 .visible .reveal{opacity:1;transform:translateY(0)}
@@ -199,6 +209,10 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 <body>
 <div class="progress-bar" id="progressBar"></div>
 <span class="kbd-hint">&uarr; &darr; navigate</span>
+<div class="canary-widget">
+  <label for="canaryWidgetInput">canary id</label>
+  <input type="text" id="canaryWidgetInput" class="canary-id-input" inputmode="numeric" placeholder="208" aria-label="today's canary id">
+</div>
 
 <!-- ─── s01 · TITLE ─────────────────────────────────────── -->
 <section class="slide deep" id="s01" data-speaker="Open cold on the title. This is the capstone: every lesson since Lesson 1 converges into one running system today, and none of the earlier lessons were dress rehearsals for this. Read the subtitle aloud while pointing at the flow row: Postgres, Debezium, Kafka plus Schema Registry, Spark, ClickHouse, API. Do not explain any box yet — that explanation is the whole lesson. Land on 'seven boundaries' — that count is deliberate and will be justified slide by slide.">
@@ -231,19 +245,6 @@ h2 em.hot,h1 em.hot{color:var(--red)}
       <span class="badge">Spark</span>
       <span class="badge">ClickHouse</span>
     </div>
-  </div>
-</section>
-
-<!-- ─── s02 · THE TURN ──────────────────────────────────── -->
-<section class="slide" id="s02" data-speaker="Lesson 10 closed with a genuine mic-drop line — read it exactly as quoted, let it land, then pivot hard on 'It wasn't the ending.' Students should feel the rug pull: the tidy course arc was actually just an inventory of parts. Today those parts have to work together, with no shared transaction across any of them.">
-  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
-    <div class="section-marker reveal">closing the loop &middot; lesson 10</div>
-    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Lesson 10 ended like a <em>finale</em>.</h2>
-    <div class="callout note reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">
-      <div class="ico" style="color:var(--gold)">&#9432;</div>
-      <div class="ctxt">&ldquo;Ten lessons, one row. &hellip; The skill was never the tools. It was measuring whether you needed them.&rdquo;<br><strong>&mdash; Lesson 10, closing line</strong></div>
-    </div>
-    <p class="lede reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">It wasn't the ending. It was the <em style="color:var(--gold);font-style:italic">parts list</em>.</p>
   </div>
 </section>
 
@@ -307,26 +308,63 @@ h2 em.hot,h1 em.hot{color:var(--red)}
 </section>
 
 <!-- ─── s10 · COLD OPEN ─────────────────────────────────── -->
-<section class="slide" id="s10" data-speaker="Cold open: show the answer before any mechanism. Run verify.py live if possible, or read the pasted output aloud. The key move is id=208 — say it out loud and tell students to remember that number, because every diagram for the rest of the lesson traces back to this one order. Do not explain PASS/FAIL logic yet; that comes at s27. Right now this is just: here is proof the whole pipeline already works end to end.">
+<section class="slide" id="s10" data-speaker="Cold open: show the answer before any mechanism. Run verify.py --verbose live if possible — the --verbose flag prints a narration line (STEP n/5) before each wait, so read that line aloud, then let the ↳ detail line land with the real WAL LSN / Kafka offset / ClickHouse version as the pipeline actually produces it. Plain verify.py (no flag) is the exact grading-contract output reused later at s27/s41 — don't confuse the two. The key move is the id — say it out loud and tell students to remember that number, because every diagram for the rest of the lesson traces back to this one order. Do not explain PASS/FAIL logic yet; that comes at s27. Right now this is just: here is proof the whole pipeline already works end to end.">
   <div class="slide-content" style="max-width:min(94vw,1000px);margin:0 auto;">
     <div class="section-marker reveal">cold open</div>
     <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">We already have the <em>answer</em>.</h2>
     <p class="sub reveal" style="margin-top:0.5rem">One order. The API answer first &mdash; then we walk backward through everything that had to be true for it to be correct.</p>
-    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="uv run python scripts/verify.py">
+    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="uv run python scripts/verify.py --verbose">
       <span class="plabel">run it</span>
-      <span class="pcmd">uv run python scripts/verify.py</span>
+      <span class="pcmd">uv run python scripts/verify.py --verbose</span>
     </div>
-    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
-      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">verify.py &mdash; output</span></div>
-      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
-<span class="gy">PASS</span> update: API exposes the higher-LSN current state
-<span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
-<span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
-<span class="gy">PASS</span>: Postgres &rarr; Debezium &rarr; Avro/Kafka &rarr; Spark &rarr; ClickHouse &rarr; API</div>
+    <div class="reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <svg class="svg-dia" viewBox="0 0 980 260" role="img" aria-label="verify.py proves the canary across five steps: insert, update, nullable update, delete, and verify deletion.">
+        <defs>
+          <marker id="canaryArrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="rgba(212,165,116,0.55)"/>
+          </marker>
+        </defs>
+
+        <text class="dia-lbl" x="15" y="22">ONE CANARY &#183; FIVE PROOFS</text>
+
+        <g class="dia-flow" marker-end="url(#canaryArrow)">
+          <path d="M187 97 H212"/>
+          <path d="M384 97 H409"/>
+          <path d="M581 97 H606"/>
+          <path d="M778 97 H803"/>
+        </g>
+
+        <g class="dia-box"><rect x="15" y="70" width="172" height="54" rx="4"/></g>
+        <g class="dia-box"><rect x="212" y="70" width="172" height="54" rx="4"/></g>
+        <g class="dia-box"><rect x="409" y="70" width="172" height="54" rx="4"/></g>
+        <g class="dia-box"><rect x="606" y="70" width="172" height="54" rx="4"/></g>
+        <rect class="dia-hit" x="803" y="70" width="172" height="54" rx="4"/>
+
+        <text class="dia-key" x="101" y="93" text-anchor="middle">1 &#183; INSERT</text>
+        <text class="dia-val" x="101" y="111" text-anchor="middle">row reaches the API</text>
+
+        <text class="dia-key" x="298" y="93" text-anchor="middle">2 &#183; UPDATE</text>
+        <text class="dia-val" x="298" y="111" text-anchor="middle">higher LSN wins</text>
+
+        <text class="dia-key" x="495" y="93" text-anchor="middle">3 &#183; NULLABLE UPDATE</text>
+        <text class="dia-val" x="495" y="111" text-anchor="middle">NULL stays NULL</text>
+
+        <text class="dia-key" x="692" y="93" text-anchor="middle">4 &#183; DELETE</text>
+        <text class="dia-val" x="692" y="111" text-anchor="middle">tombstone written</text>
+
+        <text class="dia-key" x="889" y="93" text-anchor="middle">5 &#183; VERIFY DELETE</text>
+        <text class="dia-val" x="889" y="111" text-anchor="middle">API returns 404</text>
+
+        <text class="dia-cap" x="15" y="158">customer_id, amount, status &mdash; all seven hops, first time.</text>
+        <text class="dia-cap" x="15" y="178">amount/status change; ClickHouse <tspan class="dia-key">version</tspan> (the Debezium LSN) must rise, not overwrite in place.</text>
+        <text class="dia-cap" x="15" y="198">discount_code set, then cleared &mdash; must not resurrect the pre-update before-image.</text>
+        <text class="dia-cap" x="15" y="218">Postgres row removed; Debezium emits a delete event with a higher LSN than every prior version.</text>
+        <text class="dia-cap dia-hot" x="15" y="238">ClickHouse's <tspan class="dia-key">_is_deleted=1</tspan> marker wins under FINAL, and only then does the API agree and 404.</text>
+      </svg>
     </div>
     <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
       <div class="ico" style="color:var(--gold)">&#9432;</div>
-      <div class="ctxt"><strong>id=208</strong> is today's canary. Keep it in view &mdash; every hop in this lesson traces back to this one order.</div>
+      <div class="ctxt"><strong>id=<span class="canary-id">208</span></strong> is today's canary. Keep it in view &mdash; every hop in this lesson traces back to this one order.</div>
     </div>
   </div>
 </section>
@@ -686,7 +724,7 @@ by_schema_id = <span class="fn">defaultdict</span>(list)
     </div>
     <div class="code-block reveal" style="margin-top:clamp(0.4rem,0.9vh,0.6rem)">
       <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">verify.py &mdash; the canary, again</span></div>
-      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
+      <div class="code-body"><span class="gy">PASS</span> insert: id=<span class="canary-id">208</span> event=cdc.public.orders:1:80
 <span class="gy">PASS</span> update: API exposes the higher-LSN current state
 <span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
 <span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
@@ -703,6 +741,7 @@ by_schema_id = <span class="fn">defaultdict</span>(list)
   <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
     <div class="kicker reveal">Break 01</div>
     <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Ten minutes. <em>Then</em> we wire it up.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Back in ten minutes. Part two starts with the four commands that stand the whole pipeline up.</p>
     <div class="timer reveal" id="breakTimer1" data-seconds="600">
       <div class="timer-face">
         <span class="timer-disp">10:00</span>
@@ -713,7 +752,6 @@ by_schema_id = <span class="fn">defaultdict</span>(list)
         <button class="timer-btn" data-add="30" type="button">+30 s</button>
       </div>
     </div>
-    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Back in ten minutes. Part two starts with the four commands that stand the whole pipeline up.</p>
   </div>
 </section>
 
@@ -971,7 +1009,7 @@ connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy
     </div>
     <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
       <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">output</span></div>
-      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
+      <div class="code-body"><span class="gy">PASS</span> insert: id=<span class="canary-id">208</span> event=cdc.public.orders:1:80
 <span class="gy">PASS</span> update: API exposes the higher-LSN current state
 <span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
 <span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
@@ -988,7 +1026,8 @@ connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy
   <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
     <div class="kicker reveal">Break</div>
     <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">You proved it works. <em>Now break it.</em></h1>
-    <div class="timer reveal" id="breakTimer1" data-seconds="600">
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Next: evolve the schema live, then push the pipeline into real backpressure on purpose.</p>
+    <div class="timer reveal" id="breakTimer2" data-seconds="600">
       <div class="timer-face">
         <span class="timer-disp">10:00</span>
         <span class="timer-hint">click to start / pause</span>
@@ -998,7 +1037,6 @@ connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy
         <button class="timer-btn" data-add="30" type="button">+30 s</button>
       </div>
     </div>
-    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Next: evolve the schema live, then push the pipeline into real backpressure on purpose.</p>
   </div>
 </section>
 
@@ -1106,7 +1144,7 @@ connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy
 </section>
 
 <!-- ─── 56 · THE BACKPRESSURE EXPERIMENT ──────────────── -->
-<section class="slide" id="s56" data-speaker="Set this up as an experiment, not just a command. Recreate the stream-processor with SINK_DELAY_SECONDS=10 injected — say explicitly that this env var is a lesson-only fault-injection point, it does not exist in any production code path, it's there specifically so you can manufacture backpressure on demand. Then fire a rate-100 burst for 30 seconds and watch Grafana live. Recreate again without the env var to remove the injected delay and watch recovery.">
+<section class="slide" id="s56" data-speaker="Set this up as an experiment, not just a command. Recreate the stream-processor with SINK_DELAY_SECONDS=10 injected — say explicitly that this env var is a lesson-only fault-injection point, it does not exist in any production code path, it's there specifically so you can manufacture backpressure on demand. Then fire a rate-200 burst for 60 seconds and watch Grafana live — the smaller rate-100/30s burst was tested and never crosses the 1000-record alert threshold, so use these exact parameters or the Lesson11KafkaLagHigh alert never fires. Recreate again without the env var to remove the injected delay and watch recovery.">
   <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
     <div class="section-marker reveal">the backpressure experiment</div>
     <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Inject a delay. <em>Then hit it hard.</em></h2>
@@ -1114,9 +1152,9 @@ connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy
       <span class="plabel">1 &middot; inject a 10s sink delay</span>
       <span class="pcmd">SINK_DELAY_SECONDS=10 docker compose up -d --force-recreate stream-processor</span>
     </div>
-    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="uv run python scripts/load_generator.py --rate 100 --duration 30">
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="uv run python scripts/load_generator.py --rate 200 --duration 60">
       <span class="plabel">2 &middot; burst load</span>
-      <span class="pcmd">uv run python scripts/load_generator.py --rate 100 --duration 30</span>
+      <span class="pcmd">uv run python scripts/load_generator.py --rate 200 --duration 60</span>
     </div>
     <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="docker compose up -d --force-recreate stream-processor">
       <span class="plabel">3 &middot; remove the delay, recover</span>
@@ -1363,6 +1401,32 @@ document.querySelectorAll('[data-copy]').forEach(block => {
   });
   header.appendChild(btn);
 });
+
+// canary id — one editable value, synced to every .canary-id span (and
+// every .canary-id-input field) across the whole deck, persisted so it
+// survives a reload mid-class.
+(function(){
+  const STORAGE_KEY = 'l11-canary-id';
+  const spans = document.querySelectorAll('.canary-id');
+  const inputs = document.querySelectorAll('.canary-id-input');
+  function apply(value){
+    const clean = (value || '').trim();
+    const display = clean || '208';
+    spans.forEach(s => { s.textContent = display; });
+    inputs.forEach(i => { if (i.value !== clean) i.value = clean; });
+  }
+  function setValue(value){
+    apply(value);
+    try { localStorage.setItem(STORAGE_KEY, value || ''); } catch (e) { /* ignore */ }
+  }
+  let stored = '';
+  try { stored = localStorage.getItem(STORAGE_KEY) || ''; } catch (e) { /* ignore */ }
+  apply(stored);
+  inputs.forEach(input => {
+    input.value = stored;
+    input.addEventListener('input', () => setValue(input.value));
+  });
+})();
 
 // break timers
 (function(){
