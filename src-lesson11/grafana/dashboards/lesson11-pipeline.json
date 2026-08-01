@@ -1,0 +1,102 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "How much work is waiting. This is Spark's distance from the Kafka head, computed from query progress — not a Kafka consumer-group lag, because Structured Streaming keeps its offsets in its own checkpoint.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 100}, {"color": "red", "value": 1000}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [{"expr": "pipeline_kafka_lag_records", "legendFormat": "records behind head", "refId": "A"}],
+      "title": "1 · Lag — Spark offset-head distance",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "Can the stage drain what arrives? Processed is what Spark handed to the sink. Arrival is derived: processed + the rate at which the backlog is growing. When arrival sits above processed, lag is accumulating; recovery needs processed above arrival.",
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 8, "lineWidth": 2}, "unit": "rows/sec"}, "overrides": [{"matcher": {"id": "byName", "options": "arrival"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "processed"}, "properties": [{"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}}]}]},
+      "gridPos": {"h": 7, "w": 9, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "targets": [
+        {"expr": "rate(pipeline_input_rows_total[1m])", "legendFormat": "processed", "refId": "A"},
+        {"expr": "clamp_min(rate(pipeline_input_rows_total[1m]) + deriv(pipeline_kafka_lag_records[1m]), 0)", "legendFormat": "arrival", "refId": "B"}
+      ],
+      "title": "2 · Throughput — arrival vs processed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "What the user feels, split into two different questions. Staleness = now - newest source change; it climbs whenever the source is idle, which is not a failure. Transit = ingested_at - source_ts; it stays flat while idle and only rises under real backpressure. -1 means there was nothing to measure.",
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 0, "lineWidth": 2}, "min": -1, "unit": "s"}, "overrides": [{"matcher": {"id": "byName", "options": "staleness (ages when idle)"}, "properties": [{"id": "color", "value": {"fixedColor": "purple", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "pipeline transit"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]}]},
+      "gridPos": {"h": 7, "w": 9, "x": 15, "y": 0},
+      "id": 3,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "targets": [
+        {"expr": "api_data_freshness_seconds", "legendFormat": "staleness (ages when idle)", "refId": "A"},
+        {"expr": "api_pipeline_transit_seconds", "legendFormat": "pipeline transit", "refId": "B"},
+        {"expr": "pipeline_end_to_end_latency_seconds", "legendFormat": "oldest change in last batch", "refId": "C"}
+      ],
+      "title": "3 · Freshness — staleness vs transit",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "The trigger interval is 5s. Once a micro-batch takes longer than its trigger, batches queue back-to-back and lag can only grow. Buckets extend to 120s so the SINK_DELAY_SECONDS experiment is actually visible instead of flatlining at the top bucket.",
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 8, "lineWidth": 2, "thresholdsStyle": {"mode": "line"}}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 5}]}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 7},
+      "id": 4,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(pipeline_batch_duration_seconds_bucket[5m])))", "legendFormat": "p95 batch duration", "refId": "A"}],
+      "title": "Spark micro-batch duration (p95) — red line = 5s trigger",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "Distinct Confluent Avro writer schema IDs decoded in the last batch. This is the schema-evolution moment made visible: it steps from 1 to 2 while both versions are still retained in the topic, with no processor restart.",
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "stepAfter": true}, "decimals": 0, "min": 0, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 5, "x": 8, "y": 7},
+      "id": 5,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"expr": "pipeline_schema_ids_in_batch", "legendFormat": "writer schemas in batch", "refId": "A"}],
+      "title": "Avro writer schemas per batch",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "Serving latency of the current-state API. ClickHouse is answering FINAL queries while Spark is writing into the same table.",
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 8, "lineWidth": 2}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 6, "x": 13, "y": 7},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(api_http_request_duration_seconds_bucket[5m])))", "legendFormat": "HTTP request p95", "refId": "A"}],
+      "title": "API request latency (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "lesson11-prometheus"},
+      "description": "Dependency health, kept separate from data freshness on purpose. A reachable pipeline with stale data and an unreachable pipeline are different incidents.",
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"color": "red", "text": "DOWN"}, "1": {"color": "green", "text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}, "unit": "none"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 5, "x": 19, "y": 7},
+      "id": 7,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": false},
+      "targets": [{"expr": "up{job=~\"stream-processor|api|clickhouse\"}", "legendFormat": "{{job}}", "refId": "A"}],
+      "title": "Dependency health",
+      "type": "stat"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["lesson11", "cdc", "spark", "clickhouse"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "timezone": "browser",
+  "title": "Lesson 11 — End-to-end streaming pipeline",
+  "uid": "lesson11-pipeline",
+  "version": 2
+}

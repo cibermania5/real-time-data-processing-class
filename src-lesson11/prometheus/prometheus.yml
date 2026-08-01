@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+scrape_configs:
+  - job_name: stream-processor
+    static_configs:
+      - targets: ["stream-processor:9108"]
+
+  - job_name: api
+    static_configs:
+      - targets: ["api:8000"]
+
+  - job_name: clickhouse
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["clickhouse:9363"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

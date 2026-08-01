@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 11 · One order, seven boundaries · End-to-end</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   LESSON 11 — "SEVEN BOUNDARIES" DESIGN SYSTEM
+   Dark ground, mint (durable/committed) + orange (in-flight/at-risk)
+   accents, Bricolage Grotesque display, Inter body, JetBrains Mono code.
+   Structure and every class below reused verbatim from the shared
+   deck skeleton; only :root tokens + font link changed for this lesson.
+   ============================================================ */
+:root{
+  --bg:#0a0e13; --bg-deep:#06090c; --panel:#121922; --panel2:#19222d;
+  --text:#eef3f6; --soft:#b9c4cc; --muted:#8593a0;
+  --gold:#5fd3a8; --gold-soft:rgba(95,211,168,0.10); --gold-dim:rgba(95,211,168,0.22);
+  --red:#ff7a45;  --red-soft:rgba(255,122,69,0.10);  --red-dim:rgba(255,122,69,0.22);
+  --grid:rgba(95,211,168,0.045);
+  --code-bg:#0e141b;
+  --display:'Bricolage Grotesque',sans-serif; --sans:'Inter',sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --dur:0.7s; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+.slide{
+  width:100vw;height:100vh;height:100dvh;overflow:hidden;position:relative;scroll-snap-align:start;
+  display:flex;flex-direction:column;padding:clamp(1.3rem,3.5vw,3.3rem) clamp(1.4rem,5vw,4.5rem);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+}
+.slide-content{flex:1;display:flex;flex-direction:column;justify-content:center;max-height:100%;min-height:0;overflow:hidden}
+.slide.deep{background-color:var(--bg-deep)}
+
+.crumbs{display:flex;flex-wrap:wrap;font-family:var(--mono);font-size:clamp(0.55rem,0.92vw,0.7rem);color:var(--muted);letter-spacing:0.03em}
+.crumb{padding-right:0.8em;margin-right:0.8em;border-right:1px solid var(--gold-dim)}
+.crumb:last-child{border-right:0;margin-right:0;padding-right:0}
+.crumb.on{color:var(--text);font-weight:700;position:relative}
+.crumb.on::after{content:'';position:absolute;left:0;right:0.8em;bottom:-0.45em;height:2px;background:var(--gold)}
+
+.kicker{font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.74rem);letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:clamp(0.58rem,0.95vw,0.72rem);letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)}
+.section-marker{display:inline-flex;align-items:center;gap:0.4rem;font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);
+  font-weight:700;text-transform:uppercase;letter-spacing:0.12em;padding-bottom:0.35rem;border-bottom:2px solid var(--gold);color:var(--gold);align-self:flex-start}
+.section-marker.hot{border-color:var(--red);color:var(--red)}
+h1{font-family:var(--display);font-weight:900;line-height:0.98;letter-spacing:-0.025em;font-size:clamp(2.5rem,7.5vw,5.6rem);color:var(--text)}
+h2{font-family:var(--display);font-weight:700;line-height:1.05;letter-spacing:-0.015em;font-size:clamp(1.55rem,4.2vw,2.9rem);color:var(--text)}
+h2 em,h1 em{font-style:italic;font-weight:700;color:var(--gold)}
+h2 em.hot,h1 em.hot{color:var(--red)}
+.sub{font-family:var(--sans);font-weight:400;font-size:clamp(0.84rem,1.5vw,1.08rem);color:var(--soft);max-width:640px;line-height:1.6}
+.lede{font-family:var(--sans);font-weight:500;font-size:clamp(0.95rem,1.8vw,1.3rem);color:var(--text);line-height:1.4}
+.label{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted)}
+
+.term{font-family:var(--mono);font-size:0.84em;color:var(--gold);white-space:nowrap;padding:0 0.1em;border-bottom:2px solid var(--gold)}
+.term.hot{color:var(--red);border-color:var(--red)}
+.hl{background:var(--gold-soft);color:var(--gold);padding:0.04em 0.32em;border-radius:2px;font-weight:600}
+.ink-mono{font-family:var(--mono);font-size:0.88em;background:rgba(245,242,235,0.08);padding:0.05em 0.35em;border-radius:3px;color:#e7e3d8}
+
+.bullets{list-style:none;display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.5rem)}
+.bullets li{font-family:var(--sans);font-size:clamp(0.74rem,1.25vw,0.94rem);color:var(--text);line-height:1.45;padding-left:1.35em;text-indent:-1.35em}
+.bullets li::before{content:'\2014';color:var(--gold);font-weight:700;margin-right:0.55em}
+.bullets.hot li::before{color:var(--red)}
+.bullets li strong{font-weight:600}
+
+/* No flex-grow: a stretching grid eats the free space that .slide-content's
+   justify-content:center needs, which pins the block to the top of the slide. */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,2.5vw,2rem);flex:0 1 auto;min-height:0}
+@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:clamp(0.3rem,0.7vh,0.55rem);min-height:0}
+.col-label{font-family:var(--mono);font-size:clamp(0.55rem,0.85vw,0.68rem);font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
+
+.big-q{font-family:var(--display);font-weight:700;font-size:clamp(1.6rem,4.4vw,3.2rem);line-height:1.12;letter-spacing:-0.02em;color:var(--text);max-width:22ch}
+
+.callout{display:flex;gap:clamp(0.4rem,0.9vw,0.65rem);padding:clamp(0.4rem,0.9vh,0.7rem) clamp(0.6rem,1.2vw,1rem);
+  border-radius:5px;border-left:3px solid;flex-shrink:0;background:var(--panel)}
+.callout .ico{flex-shrink:0;width:clamp(0.95rem,1.4vw,1.15rem);height:clamp(0.95rem,1.4vw,1.15rem);margin-top:0.05em}
+.callout .ctxt{font-family:var(--sans);font-size:clamp(0.66rem,1.1vw,0.85rem);line-height:1.5;color:var(--soft)}
+.callout .ctxt strong{color:var(--text)}
+.callout.note{border-color:var(--gold-dim)}
+.callout.danger{background:var(--red-soft);border-color:var(--red)}
+.callout.proof{background:var(--gold-soft);border-color:var(--gold)}
+
+.prompt{background:var(--code-bg);border:1px solid var(--panel2);border-left:3px solid var(--gold);border-radius:5px;padding:clamp(0.42rem,0.95vh,0.68rem) clamp(0.7rem,1.4vw,1.05rem)}
+.prompt .plabel{display:block;font-family:var(--mono);font-size:clamp(0.48rem,0.75vw,0.6rem);font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
+.prompt .pcmd{display:block;font-family:var(--mono);font-size:clamp(0.6rem,1vw,0.78rem);color:#c4ccd4;line-height:1.7}
+.prompt .pcmd::before{content:'\276F  ';color:var(--gold);font-weight:700}
+
+.code-block{background:var(--code-bg);border:1px solid var(--panel2);border-radius:6px;overflow:hidden;min-height:0}
+.code-header{display:flex;align-items:center;gap:5px;padding:clamp(0.28rem,0.5vh,0.4rem) clamp(0.5rem,1vw,0.8rem);
+  background:rgba(212,165,116,0.05);border-bottom:1px solid var(--panel2)}
+.code-dot{width:7px;height:7px;border-radius:50%;background:var(--panel2)}
+.code-label{margin-left:auto;font-family:var(--mono);font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.code-copy{background:var(--panel2);border:1px solid var(--gold-dim);color:var(--text);font-family:var(--mono);font-size:clamp(0.45rem,0.7vw,0.58rem);padding:0.18em 0.65em;border-radius:4px;cursor:pointer;transition:background .15s,color .15s}
+.code-copy:hover{background:var(--gold-dim);color:var(--gold)}
+.code-copy.copied{color:var(--gold)}
+.code-body{padding:clamp(0.5rem,1vh,0.85rem) clamp(0.7rem,1.3vw,1.1rem);font-family:var(--mono);
+  font-size:clamp(0.55rem,0.85vw,0.72rem);line-height:1.62;color:#c4ccd4;white-space:pre;overflow:hidden;text-align:left}
+.k{color:#7fb4e8}.s{color:#d8b478}.fn{color:#e7eaee}.v{color:#9fb6c9}
+.g{color:#d8b478}.n{color:#7fd6a4}.r{color:var(--red);font-weight:700}.cm{color:#5b6672;font-style:italic}
+.gy{color:var(--gold)}
+
+.arch{font-family:var(--mono);font-size:clamp(0.5rem,0.82vw,0.66rem);color:var(--soft);line-height:1.5;white-space:pre;
+  background:var(--panel);border:1px solid var(--panel2);border-radius:6px;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(0.9rem,1.6vw,1.3rem);overflow:hidden}
+
+/* ── SVG diagrams ──────────────────────────────────────────────────────────
+   Scale with the slide via viewBox; all type is JetBrains Mono to match .arch.
+   Shared vocabulary: .dia-box = a stored thing, .dia-hit = the thing the
+   engine actually reads, .dia-skip = what it skipped, .dia-flow = movement. */
+.svg-dia{display:block;width:100%;height:auto;max-height:40vh;background:var(--panel);
+  border:1px solid var(--panel2);border-radius:6px}
+.svg-dia text{font-family:var(--mono);fill:var(--soft)}
+.svg-dia .dia-lbl{font-size:11px;fill:var(--muted);letter-spacing:0.09em}
+.svg-dia .dia-cap{font-size:11px;fill:var(--muted)}
+.svg-dia .dia-val{font-size:12px;fill:var(--soft)}
+.svg-dia .dia-key{font-size:12px;fill:var(--gold)}
+.svg-dia .dia-box{fill:var(--panel2);stroke:rgba(212,165,116,0.20);stroke-width:1}
+.svg-dia .dia-hit{fill:rgba(212,165,116,0.20);stroke:var(--gold);stroke-width:1.5}
+.svg-dia .dia-skip{fill:var(--panel2);stroke:rgba(245,242,235,0.07);stroke-width:1}
+.svg-dia .dia-flow{stroke:rgba(212,165,116,0.45);stroke-width:1.5;fill:none}
+.svg-dia .dia-tick{stroke:rgba(245,242,235,0.13);stroke-width:1}
+.svg-dia .dia-hot{fill:var(--red)}
+.svg-dia .dia-hot-s{stroke:var(--red);stroke-width:1.5;fill:none}
+
+.dtable{width:100%;border-collapse:collapse}
+.dtable th,.dtable td{font-family:var(--sans);font-size:clamp(0.62rem,1.05vw,0.84rem);
+  padding:clamp(0.22rem,0.5vh,0.42rem) clamp(0.4rem,0.9vw,0.75rem);text-align:left;border-bottom:1px solid var(--panel2)}
+.dtable th{font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;font-size:clamp(0.5rem,0.78vw,0.62rem);color:var(--muted)}
+.dtable td.num,.dtable th.num{font-family:var(--mono);text-align:right}
+.dtable tr:last-child td{border-bottom:0}
+.dtable .hot{color:var(--red);font-weight:600}
+.dtable .cool{color:var(--gold);font-weight:600}
+
+.stat{font-family:var(--mono);font-weight:700;font-size:clamp(1.5rem,3.6vw,2.7rem);line-height:1;color:var(--text)}
+.stat.cool{color:var(--gold)}.stat.red{color:var(--red)}
+.stat-label{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+
+.flow{display:flex;align-items:center;gap:clamp(0.5rem,1vw,0.8rem);flex-wrap:wrap;margin-top:clamp(0.6rem,1.5vh,1rem)}
+.flow .box{font-family:var(--mono);font-size:clamp(0.58rem,0.95vw,0.72rem);font-weight:700;padding:clamp(0.45rem,0.9vh,0.7rem) clamp(0.7rem,1.2vw,1rem);
+  border-radius:5px;background:var(--panel2);border:1px solid var(--gold-dim);color:var(--gold)}
+.flow .arrow{font-family:var(--mono);color:var(--muted);font-size:clamp(0.7rem,1.2vw,0.9rem)}
+
+.badges{display:flex;gap:clamp(0.5rem,1vw,0.8rem);margin-top:clamp(1.2rem,2.5vh,1.8rem);flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);letter-spacing:0.08em;text-transform:uppercase;
+  padding:clamp(0.35rem,0.7vh,0.5rem) clamp(0.6rem,1.2vw,0.9rem);border-radius:3px;border:1px solid var(--gold-dim);color:var(--gold)}
+
+.progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0%;z-index:100;transition:width .2s var(--ease)}
+.kbd-hint{position:fixed;bottom:clamp(0.6rem,1.5vh,1rem);right:clamp(0.8rem,2vw,1.5rem);font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.62rem);color:var(--muted);z-index:100}
+
+/* animations */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.visible .reveal{opacity:1;transform:translateY(0)}
+.reveal:nth-child(1){transition-delay:.05s}
+.reveal:nth-child(2){transition-delay:.12s}
+.reveal:nth-child(3){transition-delay:.19s}
+.reveal:nth-child(4){transition-delay:.26s}
+.reveal:nth-child(5){transition-delay:.33s}
+.reveal:nth-child(6){transition-delay:.40s}
+
+/* simple decorative geometry — cheap, content-agnostic. Drop 2-3 of these
+   onto any "deep" (title/divider/break/close) slide for visual texture. */
+.geo{position:absolute;pointer-events:none;z-index:0}
+.geo-circle{top:8%;right:6%;width:min(30vw,280px);height:min(30vw,280px);border:2px solid rgba(245,242,235,0.10);border-radius:50%}
+.geo-dot{bottom:10%;left:5%;width:12px;height:12px;background:var(--red);border-radius:50%;opacity:0.7}
+.geo-line{bottom:18%;left:8%;width:clamp(60px,12vw,140px);height:1px;background:rgba(245,242,235,0.10)}
+
+/* prediction spoilers — blurred until click or R (convention from L5 onward) */
+.spoiler{position:relative;cursor:pointer}
+.spoiler>*{filter:blur(9px);transition:filter .5s var(--ease)}
+.spoiler::after{content:'predict first \00b7 click or press R';position:absolute;inset:0;z-index:2;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-size:clamp(0.6rem,1vw,0.78rem);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)}
+.spoiler.revealed>*{filter:none}
+.spoiler.revealed::after{display:none}
+
+/* break timer */
+.timer{display:flex;flex-direction:column;align-items:center;gap:0.9rem;margin-top:clamp(1.2rem,2.5vh,2rem)}
+.timer-face{cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:0.35rem;padding:clamp(0.7rem,1.4vh,1.1rem) clamp(1.2rem,2vw,2rem);background:var(--panel);border:1px solid var(--gold-dim);border-radius:8px;transition:border-color .2s,box-shadow .2s}
+.timer-face:hover{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.timer-disp{font-family:var(--mono);font-size:clamp(2.2rem,5.5vw,4.2rem);font-weight:700;color:var(--gold);line-height:1}
+.timer-hint{font-family:var(--mono);font-size:clamp(0.5rem,0.8vw,0.65rem);text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)}
+.timer-controls{display:flex;gap:0.6rem}
+.timer-btn{font-family:var(--mono);font-size:clamp(0.55rem,0.9vw,0.7rem);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:0.55em 1.1em;border:1px solid var(--gold-dim);background:var(--panel);color:var(--text);border-radius:4px;cursor:pointer;transition:background .15s,border-color .15s}
+.timer-btn:hover{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
+.timer.running .timer-disp{color:var(--text)}
+.timer.done .timer-disp{color:var(--red);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}html{scroll-behavior:auto}}
+@media (max-height:600px){.geo-circle,.kbd-hint{display:none}.sub{font-size:clamp(0.75rem,1.4vw,1rem)}h1{font-size:clamp(1.8rem,6vw,3rem)}h2{font-size:clamp(1.1rem,3vw,1.8rem)}}
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar"></div>
+<span class="kbd-hint">&uarr; &darr; navigate</span>
+
+<!-- ─── s01 · TITLE ─────────────────────────────────────── -->
+<section class="slide deep" id="s01" data-speaker="Open cold on the title. This is the capstone: every lesson since Lesson 1 converges into one running system today, and none of the earlier lessons were dress rehearsals for this. Read the subtitle aloud while pointing at the flow row: Postgres, Debezium, Kafka plus Schema Registry, Spark, ClickHouse, API. Do not explain any box yet — that explanation is the whole lesson. Land on 'seven boundaries' — that count is deliberate and will be justified slide by slide.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;position:relative;z-index:1;">
+    <div class="crumbs reveal"><span class="crumb on">Lesson 11</span></div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">One order, <em>seven boundaries</em>.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">OLTP &rarr; CDC &rarr; Kafka &rarr; Spark &rarr; ClickHouse &rarr; API.</p>
+    <div class="flow reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">Postgres</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">Debezium</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">Kafka</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">Schema Registry</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">Spark</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">ClickHouse</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="font-size:0.62rem;padding:0.4rem 0.65rem">API</div>
+    </div>
+    <div class="badges reveal">
+      <span class="badge">Postgres</span>
+      <span class="badge">Debezium</span>
+      <span class="badge">Kafka</span>
+      <span class="badge">Spark</span>
+      <span class="badge">ClickHouse</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s02 · THE TURN ──────────────────────────────────── -->
+<section class="slide" id="s02" data-speaker="Lesson 10 closed with a genuine mic-drop line — read it exactly as quoted, let it land, then pivot hard on 'It wasn't the ending.' Students should feel the rug pull: the tidy course arc was actually just an inventory of parts. Today those parts have to work together, with no shared transaction across any of them.">
+  <div class="slide-content" style="max-width:min(92vw,920px);margin:0 auto;">
+    <div class="section-marker reveal">closing the loop &middot; lesson 10</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Lesson 10 ended like a <em>finale</em>.</h2>
+    <div class="callout note reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">&ldquo;Ten lessons, one row. &hellip; The skill was never the tools. It was measuring whether you needed them.&rdquo;<br><strong>&mdash; Lesson 10, closing line</strong></div>
+    </div>
+    <p class="lede reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">It wasn't the ending. It was the <em style="color:var(--gold);font-style:italic">parts list</em>.</p>
+  </div>
+</section>
+
+<!-- ─── s03 · TWO PROMISES ──────────────────────────────── -->
+<section class="slide" id="s03" data-speaker="Two lessons made an explicit promise by name that this lesson has to keep. Read both quotes aloud, slowly — they are the reason 'Lesson 11' has been a running joke/threat since Lesson 5. Point out that L5's promise names schema registries specifically, and L8's promise names Debezium CDC specifically, and both said 'Lesson 11' by number, not 'later' or 'eventually'.">
+  <div class="slide-content" style="max-width:min(94vw,1080px);margin:0 auto;">
+    <div class="section-marker reveal">the promises</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Two promises come due <em>today</em>.</h2>
+    <div class="two-col reveal" style="margin-top:clamp(1.1rem,2.2vh,1.6rem)">
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.7rem,1.5vh,1.1rem) clamp(0.8rem,1.5vw,1.1rem)">
+        <p class="col-label" style="color:var(--gold)">Lesson 5 &middot; teaching notes, slide 24</p>
+        <p class="lede" style="font-size:clamp(0.8rem,1.4vw,1rem)">&ldquo;CDC is a <strong>schema contract</strong> between producer and consumer &mdash; the hardest operational problem in streaming, and the reason schema registries exist. <strong>We'll meet those in Lesson 11.</strong>&rdquo;</p>
+      </div>
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.7rem,1.5vh,1.1rem) clamp(0.8rem,1.5vw,1.1rem)">
+        <p class="col-label" style="color:var(--gold)">Lesson 8 &middot; README</p>
+        <p class="lede" style="font-size:clamp(0.8rem,1.4vw,1rem)">&ldquo;In the full course pipeline (<strong>Lesson 11</strong>), the transaction stream comes out of an OLTP Postgres via Debezium CDC. Here <span class="ink-mono">seed_transactions.py</span> stands in for that CDC feed so the lesson can focus on the hard part: fault tolerance.&rdquo;</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s04 · THE HONEST ADMISSION ─────────────────────── -->
+<section class="slide" id="s04" data-speaker="Name the pattern directly: every lesson since 6 quietly swapped the real, messy source for a synthetic fixture so students could isolate one mechanism at a time. That was correct pedagogy, not a shortcut — say so. Then reveal the DDL and let it sit: this is not a redesigned table for the finale, it is the literal Lesson 1 table, unchanged. Have students find NUMERIC(10,2) with their eyes — they have typed that exact clause in at least four earlier lessons.">
+  <div class="slide-content" style="max-width:min(94vw,1040px);margin:0 auto;">
+    <div class="section-marker reveal">the honest admission</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Lessons 8&ndash;10 used a <em>stand-in</em>.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.1rem)">
+      <tr><th>Lesson</th><th>Stood in for the real source</th></tr>
+      <tr><td>8</td><td>a synthetic <span class="ink-mono">transactions</span> topic</td></tr>
+      <tr><td>9</td><td>a synthetic <span class="ink-mono">orders</span> topic</td></tr>
+      <tr><td>10</td><td>a generic <span class="ink-mono">events</span> stream</td></tr>
+    </table>
+    <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">orders &mdash; Lesson 1, unchanged</span></div>
+      <div class="code-body"><span class="r">CREATE TABLE</span> <span class="n">orders</span> (
+    id          BIGINT IDENTITY <span class="r">PRIMARY KEY</span>,
+    customer_id INTEGER,
+    amount      <span class="gy">NUMERIC(10,2)</span>,
+    status      TEXT <span class="r">DEFAULT</span> <span class="s">'pending'</span>,
+    created_at  TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ
+);</div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">Each stand-in was a fixture &mdash; built so you could study <strong>one component</strong> without the rest of the system in the way. Today the source is real, and <span class="gy">NUMERIC(10,2)</span> is the same line you wrote in Lessons 1, 2, 4 and 5.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s05 · PART ONE DIVIDER ──────────────────────────── -->
+<section class="slide deep" id="s05" data-speaker="Frame Part one, which runs roughly 50 minutes and ends at the break slide (s28). Set the contract for the next hour: we are not learning any new tool. Every tool in this pipeline has already been taught. What's new is watching seven independently-committing systems try to agree on one order's current state, and building the vocabulary — the guarantee ledger — to talk about where that agreement actually lives.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part one</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The system, <em>not</em> the boxes.</h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">One order, followed hop by hop through seven systems that do not share a transaction. The guarantee ledger you build this hour is the spine of everything that follows.</p>
+  </div>
+</section>
+
+<!-- ─── s10 · COLD OPEN ─────────────────────────────────── -->
+<section class="slide" id="s10" data-speaker="Cold open: show the answer before any mechanism. Run verify.py live if possible, or read the pasted output aloud. The key move is id=208 — say it out loud and tell students to remember that number, because every diagram for the rest of the lesson traces back to this one order. Do not explain PASS/FAIL logic yet; that comes at s27. Right now this is just: here is proof the whole pipeline already works end to end.">
+  <div class="slide-content" style="max-width:min(94vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">cold open</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">We already have the <em>answer</em>.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">One order. The API answer first &mdash; then we walk backward through everything that had to be true for it to be correct.</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="uv run python scripts/verify.py">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python scripts/verify.py</span>
+    </div>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">verify.py &mdash; output</span></div>
+      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
+<span class="gy">PASS</span> update: API exposes the higher-LSN current state
+<span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
+<span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
+<span class="gy">PASS</span>: Postgres &rarr; Debezium &rarr; Avro/Kafka &rarr; Spark &rarr; ClickHouse &rarr; API</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>id=208</strong> is today's canary. Keep it in view &mdash; every hop in this lesson traces back to this one order.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s11 · THE QUESTION ──────────────────────────────── -->
+<section class="slide" id="s11" data-speaker="This is the single question to ask at every hop for the rest of the hour, in the student's own head, unprompted, by the end of the lesson. Say it once, slowly, then say it again framed as a habit: every time you look at a new system in a pipeline, ask this before you ask anything else. It is deliberately two questions welded into one, because durability and failure-mode are the same question asked from two directions.">
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;text-align:center;">
+    <div class="kicker reveal" style="align-self:center">ask this at every hop</div>
+    <h1 class="reveal" style="margin-top:clamp(0.8rem,1.8vh,1.3rem);font-size:clamp(1.9rem,5.6vw,4.1rem)">Where is this event <em>durable</em> right now &mdash; and what happens if the next process dies?</h1>
+  </div>
+</section>
+
+<!-- ─── s12 · SEVEN BOXES ───────────────────────────────── -->
+<section class="slide" id="s12" data-speaker="Walk the flow left to right, naming each box's durable position out loud. The colour logic is literal, not decorative: mint boxes are places the event has a real, addressable, durable identity; orange arrows are the gaps between them, where nothing has agreed on anything yet. Emphasize that Schema Registry and Kafka are drawn as separate boxes even though the pipeline description sometimes groups them — the schema ID and the offset are two different durable identities, and that distinction matters later (s19, s22).">
+  <div class="slide-content" style="max-width:min(96vw,1180px);margin:0 auto;">
+    <div class="section-marker reveal">the seven boxes</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Same order, seven <em>durable positions</em>.</h2>
+    <div class="flow reveal" style="justify-content:center;margin-top:clamp(1rem,2vh,1.4rem)">
+      <div class="box">Postgres<br><span style="font-size:0.68em;font-weight:400;opacity:.75">WAL LSN</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">Debezium<br><span style="font-size:0.68em;font-weight:400;opacity:.75">WAL LSN + slot</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">Kafka<br><span style="font-size:0.68em;font-weight:400;opacity:.75">topic&middot;partition&middot;offset</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">Schema Registry<br><span style="font-size:0.68em;font-weight:400;opacity:.75">schema ID</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">Spark<br><span style="font-size:0.68em;font-weight:400;opacity:.75">checkpoint offset</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">ClickHouse<br><span style="font-size:0.68em;font-weight:400;opacity:.75">versioned row</span></div>
+      <span class="arrow" style="color:var(--red)">&rarr;</span>
+      <div class="box">API<br><span style="font-size:0.68em;font-weight:400;opacity:.75">query result</span></div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong style="color:var(--gold)">Boxes</strong> are where the event has a durable, addressable position. <strong style="color:var(--red)">Arrows</strong> are still in flight &mdash; no shared transaction covers the crossing.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s13 · THE GUARANTEE LEDGER ─────────────────────── -->
+<section class="slide" id="s13" data-speaker="This table is the spine of Hour 1 — say that explicitly. Every slide for the rest of Part one either derives from a row of this table or comes back to prove one. Don't rush it: read the 'honest guarantee' column for each row aloud, because that column is the whole point — it is deliberately modest, never claiming more than the system actually gives you.">
+  <div class="slide-content" style="max-width:min(97vw,1240px);margin:0 auto;">
+    <div class="section-marker reveal">the guarantee ledger &middot; hour 1 spine</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.8rem);font-size:clamp(1.3rem,3.4vw,2.3rem)">Five boundaries, five <em>honest guarantees</em>.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <tr><th>Boundary</th><th>Durable position / identity</th><th>Honest guarantee</th><th>Recovery design</th></tr>
+      <tr>
+        <td>Postgres &rarr; Debezium</td>
+        <td>WAL LSN + replication slot</td>
+        <td>replayable CDC; normally at least once</td>
+        <td>don't acknowledge past an event that isn't durable downstream</td>
+      </tr>
+      <tr>
+        <td>Debezium &rarr; Kafka</td>
+        <td>topic, partition, offset; Confluent schema ID</td>
+        <td>durable ordered log per partition</td>
+        <td>idempotent producer helps within a session; downstream still tolerates replay</td>
+      </tr>
+      <tr>
+        <td>Kafka &rarr; Spark</td>
+        <td>offsets in the Spark checkpoint</td>
+        <td>exactly-once offset/state progress <em>inside Spark</em></td>
+        <td>checkpoint on a persistent volume, never <span class="ink-mono">/tmp</span></td>
+      </tr>
+      <tr>
+        <td>Spark &rarr; ClickHouse</td>
+        <td>LSN as row version; (topic, partition, offset) as event identity</td>
+        <td>external sink can be written more than once</td>
+        <td>versioned current-state rows make replay harmless</td>
+      </tr>
+      <tr>
+        <td>ClickHouse &rarr; API</td>
+        <td>query result at a known sink-ingest time</td>
+        <td>current state with measurable staleness</td>
+        <td>report dependency health and data freshness separately</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─── s14 · PREDICT: THE CRASH ────────────────────────── -->
+<section class="slide" id="s14" data-speaker="Predict-first. Ask for a show of hands before revealing: does ClickHouse end up with a duplicate row? Does the API answer change? Let the disagreement play out — most students correctly guess 'duplicate rows' but many wrongly guess the API answer becomes non-deterministic too. The reveal separates those two: physical duplication is expected and harmless; the API answer is untouched because ReplacingMergeTree(version) makes duplication invisible at read time. This is the setup for s16.">
+  <div class="slide-content" style="max-width:min(94vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">predict &middot; the crash</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Spark writes a batch, then <em>dies</em>.</h2>
+    <p class="lede reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">It writes a batch to ClickHouse, then dies before checkpointing. What happens?</p>
+    <div class="spoiler reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="callout proof">
+        <div class="ico" style="color:var(--gold)">&#10003;</div>
+        <div class="ctxt"><strong>The batch is replayed.</strong> Spark restarts from the last checkpoint, which never advanced, and re-reads the same Kafka offsets. <strong>ClickHouse physically gains duplicate rows</strong> &mdash; the same order_id and the same LSN, written twice. <strong>The API answer does not change</strong> &mdash; the duplicate rows share a version, so a collapse at read time treats them as one.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s15 · BIG LINE #1 ───────────────────────────────── -->
+<section class="slide" id="s15" data-speaker="Full-slide thesis statement. Let it sit in silence for a beat before moving on. This is the sentence that explains why s14's crash is not a bug: Postgres commits its transaction, Kafka commits its append, Spark commits its checkpoint, ClickHouse commits its merge — four separate, uncoordinated commits, and nothing outside any one of those systems knows about the others' commit at all.">
+  <div class="slide-content" style="max-width:min(90vw,920px);margin:0 auto;text-align:center;">
+    <div class="kicker reveal" style="align-self:center">what today proves</div>
+    <h1 class="reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem)">Atomicity ends at the <em>system boundary</em>.</h1>
+    <p class="sub reveal" style="margin:clamp(0.9rem,1.8vh,1.3rem) auto 0;text-align:center">Postgres commits. Kafka commits. Spark checkpoints. ClickHouse merges. None of those four commits is the same commit.</p>
+  </div>
+</section>
+
+<!-- ─── s16 · WHAT IS TRUE ──────────────────────────────── -->
+<section class="slide" id="s16" data-speaker="Pivot from 'what fails' to 'what the design actually guarantees, honestly'. Walk the DDL: ReplacingMergeTree(version), version = Debezium's source LSN — the exact number from s18. FINAL collapses at query time; a delete is not a physical row removal but a higher-LSN row with _is_deleted=1 winning the same collapse. Land hard on the last callout: this is convergence, not coordination. No two-phase commit exists anywhere in this stack, and there does not need to be one.">
+  <div class="slide-content" style="max-width:min(94vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">so what IS true</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Effectively-once <em>current state</em>.</h2>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.3vh,0.9rem)" data-copy="CREATE TABLE lesson11.orders_current\n(\n    order_id        UInt64,\n    customer_id     UInt32,\n    amount          Decimal(10, 2),\n    status          LowCardinality(String),\n    created_at      DateTime64(3, 'UTC'),\n    updated_at      DateTime64(3, 'UTC'),\n    version         UInt64,\n    _is_deleted     UInt8,\n    source_topic    LowCardinality(String),\n    kafka_partition UInt16,\n    kafka_offset    UInt64,\n    source_ts       DateTime64(3, 'UTC'),\n    ingested_at     DateTime64(3, 'UTC') DEFAULT now64(3)\n)\nENGINE = ReplacingMergeTree(version)\nPARTITION BY modulo(order_id, 16)\nORDER BY order_id;">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">lesson11.orders_current</span></div>
+      <div class="code-body"><span class="r">CREATE TABLE</span> <span class="n">lesson11.orders_current</span>
+(
+    order_id        UInt64,
+    customer_id     UInt32,
+    amount          Decimal(10, 2),
+    status          <span class="gy">LowCardinality</span>(String),   <span class="cm">-- L10: 213.5x compression</span>
+    created_at      DateTime64(3, <span class="s">'UTC'</span>),
+    updated_at      DateTime64(3, <span class="s">'UTC'</span>),
+    version         UInt64,                  <span class="cm">-- Debezium source.lsn</span>
+    _is_deleted     UInt8,
+    source_topic    <span class="gy">LowCardinality</span>(String),   <span class="cm">-- event identity, L6</span>
+    kafka_partition UInt16,
+    kafka_offset    UInt64,
+    source_ts       DateTime64(3, <span class="s">'UTC'</span>),
+    ingested_at     DateTime64(3, <span class="s">'UTC'</span>) <span class="r">DEFAULT</span> now64(3)
+)
+<span class="r">ENGINE</span> = <span class="gy">ReplacingMergeTree</span>(version)
+<span class="r">PARTITION BY</span> modulo(order_id, 16)
+<span class="r">ORDER BY</span> order_id;</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><span class="ink-mono">FINAL</span> collapses every version at query time; the highest <span class="ink-mono">version</span> wins. A delete is not a physical delete &mdash; it's a row with a higher LSN and <span class="ink-mono">_is_deleted=1</span> that wins the same collapse.</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.5rem,1vh,0.75rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">This is <strong>not a distributed transaction</strong>. No two-phase commit spans Postgres, Kafka, Spark and ClickHouse. It is convergence: given enough time, every reader sees the same current state.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s17 · CALLBACK L8 ───────────────────────────────── -->
+<section class="slide" id="s17" data-speaker="Callback to Lesson 8's own self-description. Students proved exactly-once inside a single processor's commit domain in L8 — that was genuinely the hardest exercise in the course up to that point. Reframe today's task honestly: it is not a harder version of that exercise, it's a wider one. Seven commit domains, none of which coordinate with each other, is a different kind of problem than one processor doing exactly-once against its own state store.">
+  <div class="slide-content" style="max-width:min(94vw,1020px);margin:0 auto;">
+    <div class="section-marker reveal">callback &middot; lesson 8</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Not harder. <em>Wider.</em></h2>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">The Lesson 8 README calls that exercise &ldquo;the hardest exercise in the course&rdquo; &mdash; and it proved exactly-once <em>inside one processor</em>.</div>
+    </div>
+    <div class="two-col reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">Lesson 8 &mdash; narrow</p>
+        <p class="lede" style="font-size:clamp(0.85rem,1.5vw,1.05rem)">One commit domain: exactly-once state and offsets, inside a single stream processor.</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">Lesson 11 &mdash; wide</p>
+        <p class="lede" style="font-size:clamp(0.85rem,1.5vw,1.05rem)">Seven commit domains that never coordinate. Not harder. Wider.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s18 · CALLBACK L1/L5 ────────────────────────────── -->
+<section class="slide" id="s18" data-speaker="Callback to the abandoned replication slot demo from Lesson 5, where students watched a slot's retained WAL grow from 12 MB to 59 MB because nothing was consuming it. That LSN was framed then purely as a warning sign — disk pressure from an unconsumed slot. Reveal its second life: the exact same monotonically increasing number is now the version column driving ReplacingMergeTree collapse. Same mechanism, opposite framing: growth was the danger sign then, ordering is the feature now.">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">callback &middot; lessons 1 &amp; 5</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The number you watched <em>grow</em>.</h2>
+    <div class="reveal" style="display:flex;align-items:center;gap:clamp(1rem,2.5vw,2rem);margin-top:clamp(1rem,2vh,1.4rem);flex-wrap:wrap">
+      <div><div class="stat red">12 MB</div><div class="stat-label">slot start &middot; lesson 5</div></div>
+      <span style="font-family:var(--mono);color:var(--muted);font-size:clamp(1.2rem,2.5vw,1.8rem)">&rarr;</span>
+      <div><div class="stat cool">59 MB</div><div class="stat-label">slot end &middot; abandoned slot demo</div></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.9rem,1.8vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">Same LSN. New job: it's the <span class="ink-mono">version</span> column in <span class="ink-mono">ReplacingMergeTree(version)</span>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s19 · CALLBACK L6 ───────────────────────────────── -->
+<section class="slide" id="s19" data-speaker="Callback to Lesson 6's Kafka fundamentals: topic, partition, offset. The trap here is that students often intuit 'offset' as a global sequence number because within a single partition it behaves like one. Break that intuition explicitly: cdc.public.orders has 3 partitions, so two events for the same order_id can land on different partitions with incomparable offsets. That is exactly why s16's design uses the Postgres LSN, not the Kafka offset, to order current state — the offset only identifies an event, it never orders one against events on another partition.">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">callback &middot; lesson 6</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">An offset is not a <em>row version</em>.</h2>
+    <div class="reveal" style="margin-top:clamp(0.8rem,1.6vh,1.1rem)"><div class="stat cool">3</div><div class="stat-label">partitions on cdc.public.orders</div></div>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">Two events for the same order_id can land on different partitions. Their offsets don't compare to each other at all.</p>
+    <div class="callout danger reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">That's precisely why the <strong>LSN orders current state</strong>, and the <strong>offset only identifies the event</strong>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s20 · SCHEMA CONTRACTS ──────────────────────────── -->
+<section class="slide" id="s20" data-speaker="Draw the writer/reader distinction in the correct direction — this trips people up constantly because 'backward compatible' sounds like it should mean 'works with old readers' when it actually means the opposite. Drill the two definitions with a concrete phrase each: BACKWARD = a new reader can read old data. FORWARD = an old reader can read new data. FULL requires both, which is what this pipeline's subject is actually set to, and say why: multiple consumers (Spark, ad hoc tooling) may lag behind the newest schema at any moment.">
+  <div class="slide-content" style="max-width:min(94vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">schema contracts, drawn correctly</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Which direction does <em>compatibility</em> point?</h2>
+    <div class="two-col reveal" style="margin-top:clamp(0.8rem,1.6vh,1.1rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">writer schema</p>
+        <p class="lede" style="font-size:clamp(0.85rem,1.5vw,1.05rem)">Debezium, at the moment it encodes a change event.</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">reader schema</p>
+        <p class="lede" style="font-size:clamp(0.85rem,1.5vw,1.05rem)">Spark's normalizer, at the moment it decodes one.</p>
+      </div>
+    </div>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <tr><th>Mode</th><th>What it guarantees</th></tr>
+      <tr><td class="cool">BACKWARD</td><td>a new reader can read old data</td></tr>
+      <tr><td class="cool">FORWARD</td><td>an old reader can read new data</td></tr>
+      <tr><td class="cool">FULL</td><td>both directions hold</td></tr>
+    </table>
+    <div class="callout proof reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">We set <span class="ink-mono">cdc.public.orders-value</span> to <strong>FULL</strong>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s21 · WIRE FORMAT ───────────────────────────────── -->
+<section class="slide" id="s21" data-speaker="Get concrete about bytes on the wire before s22's trap makes sense. Every Avro-encoded Kafka message from Debezium carries five bytes of Confluent framing before the actual payload starts. Point out that byte 0 is always exactly 0x00 by convention — it's a format marker, not data — and bytes 1 through 4 are the schema ID that makes s22's per-record lookup possible at all.">
+  <div class="slide-content" style="max-width:min(92vw,940px);margin:0 auto;">
+    <div class="section-marker reveal">the wire format</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Five bytes before the <em>data</em> even starts.</h2>
+    <div class="arch reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">BYTE 0        magic byte     0x00
+BYTES 1&ndash;4    schema ID      big-endian, 4-byte integer
+BYTES 5+      payload        Avro-encoded record</div>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">The schema ID travels <strong>on every single message</strong> &mdash; a consumer never has to guess which schema wrote a record.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s22 · THE TRAP ──────────────────────────────────── -->
+<section class="slide" id="s22" data-speaker="This is the trap most students would walk straight into without this slide. A retained Kafka topic holds records written under every schema version that has ever existed on that topic — fetching 'the latest schema' once per batch and applying it to every record silently mis-decodes the older ones. Walk the real fix line by line: decode the 4-byte schema ID per record (from s21), group the batch by that ID, fetch each distinct writer schema from the registry, normalise each group against the reader schema, then union the normalized groups back into one batch.">
+  <div class="slide-content" style="max-width:min(94vw,1020px);margin:0 auto;">
+    <div class="section-marker hot reveal">the trap</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">&ldquo;Latest&rdquo; is a <em class="hot">lie</em> for old records.</h2>
+    <div class="callout danger reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">A retained topic holds records written under <strong>every</strong> schema version that has ever existed. Fetching the latest schema once and applying it to the whole batch silently corrupts the old records.</div>
+    </div>
+    <div class="code-block reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">consumer &mdash; per-record schema ID</span></div>
+      <div class="code-body"><span class="cm"># the schema ID is inline on every record (bytes 1-4) &mdash; use it</span>
+by_schema_id = <span class="fn">defaultdict</span>(list)
+<span class="r">for</span> record <span class="r">in</span> batch:
+    schema_id = decode_schema_id(record.value)
+    by_schema_id[schema_id].append(record)
+
+<span class="r">for</span> schema_id, records <span class="r">in</span> by_schema_id.items():
+    writer_schema = registry.get_schema(schema_id)
+    normalized = [normalize(r, writer_schema, reader_schema)
+                  <span class="r">for</span> r <span class="r">in</span> records]
+    union_batch.extend(normalized)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s23 · BIG LINE #2 ───────────────────────────────── -->
+<section class="slide" id="s23" data-speaker="Second full-slide thesis. This is the direct payoff of s20-s22: a registry enforces that a schema change won't silently break compatibility, but it has zero mechanism for rewriting or re-processing anything a consumer already decoded under an old assumption. The consumer's own code (s22's grouping logic) is the only thing standing between 'the registry approved this schema' and 'my batch decoded correctly'.">
+  <div class="slide-content" style="max-width:min(90vw,940px);margin:0 auto;text-align:center;">
+    <div class="kicker reveal" style="align-self:center">the second law</div>
+    <h1 class="reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem);font-size:clamp(1.8rem,5.2vw,3.6rem)">A schema registry stores <em>contracts</em>; it does not migrate consumers for you.</h1>
+  </div>
+</section>
+
+<!-- ─── s24 · BACKPRESSURE ──────────────────────────────── -->
+<section class="slide" id="s24" data-speaker="Walk the causal chain left to right as a chain of consequence, not a list: a slow sink forces longer micro-batches, which widens the distance between the consumer offset and the partition head, which is exactly what ages the freshness metric. Kafka is a shock absorber here, not a fix — it will hold that growing distance until retention expires or the broker's disk fills, and then it stops absorbing. Close with the Lesson 9 callback and the specific measured numbers: a 10ms trigger and a 250ms trigger produced an identical 5.0s p50, because both were bounded by the same 5-second watermark, not by batch overhead — floor is max(trigger, batch_time).">
+  <div class="slide-content" style="max-width:min(96vw,1120px);margin:0 auto;">
+    <div class="section-marker hot reveal">backpressure</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Backpressure is <em class="hot">stored time</em>.</h2>
+    <div class="flow reveal" style="justify-content:center;margin-top:clamp(0.9rem,1.8vh,1.3rem)">
+      <div class="box" style="border-color:var(--red-dim);color:var(--red)">slow sink</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--red-dim);color:var(--red)">longer batches</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--red-dim);color:var(--red)">offset&ndash;head distance grows</div>
+      <span class="arrow">&rarr;</span>
+      <div class="box" style="border-color:var(--red-dim);color:var(--red)">freshness ages</div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">Kafka absorbs it &mdash; but only until <strong>retention</strong> or <strong>disk</strong> becomes the next limit.</div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.5rem,1vh,0.75rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>Callback &middot; Lesson 9:</strong> Spark's floor is <span class="ink-mono">max(trigger, batch_time)</span>. You measured it &mdash; a 10ms trigger and a 250ms trigger gave the identical 5.0s p50, both bounded by the shared 5-second watermark, not batch overhead.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s25 · THREE METRICS ─────────────────────────────── -->
+<section class="slide" id="s25" data-speaker="Lay these out exactly the way the Grafana dashboard is physically arranged, left to right: lag, throughput, freshness. Each answers a different question and none of them substitutes for the others. Land hard on the closing callout — this is the honesty check for the whole observability stack: a green dashboard tells you nothing broke that you're watching for, it does not prove the pipeline is correct. Only the traced canary (s27) proves correctness.">
+  <div class="slide-content" style="max-width:min(94vw,1040px);margin:0 auto;">
+    <div class="section-marker reveal">three numbers, one dashboard</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Lag, throughput, <em>freshness</em>.</h2>
+    <div class="reveal" style="display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(1rem,2vw,1.8rem);margin-top:clamp(1rem,2vh,1.4rem)">
+      <div class="col">
+        <p class="stat-label">01</p>
+        <div class="stat cool">lag</div>
+        <p class="sub" style="margin-top:0.4rem;font-size:clamp(0.72rem,1.2vw,0.88rem)">How much work is waiting.</p>
+      </div>
+      <div class="col">
+        <p class="stat-label">02</p>
+        <div class="stat cool">throughput</div>
+        <p class="sub" style="margin-top:0.4rem;font-size:clamp(0.72rem,1.2vw,0.88rem)">Can each stage drain it.</p>
+      </div>
+      <div class="col">
+        <p class="stat-label">03</p>
+        <div class="stat cool">freshness</div>
+        <p class="sub" style="margin-top:0.4rem;font-size:clamp(0.72rem,1.2vw,0.88rem)">What the user feels.</p>
+      </div>
+    </div>
+    <div class="callout danger reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">A green dashboard is <strong>supporting evidence</strong>, not proof.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s26 · BIG LINE #3 ───────────────────────────────── -->
+<section class="slide" id="s26" data-speaker="Third and final full-slide thesis for Part one. This sentence fuses s24's causal chain (lag is time the pipeline owes) with s25's dashboard framing (freshness is the only one of the three metrics a user ever actually perceives). Say it once, then let s27 immediately operationalize it: the lab's pass condition is not a metric on this slide, it's a canary trace.">
+  <div class="slide-content" style="max-width:min(90vw,940px);margin:0 auto;text-align:center;">
+    <div class="kicker reveal" style="align-self:center">the third law</div>
+    <h1 class="reveal" style="margin-top:clamp(0.7rem,1.6vh,1.1rem);font-size:clamp(1.9rem,5.6vw,3.9rem)">Lag is <em>stored time</em>, and freshness is what the <em>user feels</em>.</h1>
+  </div>
+</section>
+
+<!-- ─── s27 · THE LAB CONTRACT ──────────────────────────── -->
+<section class="slide" id="s27" data-speaker="This is the actual grading contract for the lab, and it should feel like a relief after three consecutive gotcha-heavy callback slides: the bar is concrete and checkable. Run preflight first — it's a dependency smoke test, not the real proof. The real proof is verify.py, which is the exact same canary and output already shown at the cold open (s10, id=208) — point that out explicitly, this is not new output, it's the same PASS block doing double duty as both the opening hook and the closing bar.">
+  <div class="slide-content" style="max-width:min(94vw,1020px);margin:0 auto;">
+    <div class="section-marker reveal">the lab contract</div>
+    <h2 class="reveal" style="margin-top:clamp(0.5rem,1.2vh,0.8rem);font-size:clamp(1.3rem,3.6vw,2.4rem)">Pass condition: a <em>traced canary</em>, not a green dashboard.</h2>
+    <div class="prompt reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)" data-copy="uv run python scripts/preflight.py">
+      <span class="plabel">run it first</span>
+      <span class="pcmd">uv run python scripts/preflight.py</span>
+    </div>
+    <div class="code-block reveal" style="margin-top:clamp(0.4rem,0.9vh,0.6rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">preflight.py &mdash; output</span></div>
+      <div class="code-body"><span class="gy">OK</span>   postgres
+<span class="gy">OK</span>   clickhouse
+<span class="gy">OK</span>   schema-registry   HTTP 200
+<span class="gy">OK</span>   kafka-connect     HTTP 200
+<span class="gy">OK</span>   debezium-task     RUNNING/RUNNING
+<span class="gy">OK</span>   processor-metrics HTTP 200
+<span class="gy">OK</span>   api               HTTP 200</div>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.75rem)" data-copy="uv run python scripts/verify.py">
+      <span class="plabel">then this &mdash; the real bar</span>
+      <span class="pcmd">uv run python scripts/verify.py</span>
+    </div>
+    <div class="code-block reveal" style="margin-top:clamp(0.4rem,0.9vh,0.6rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">verify.py &mdash; the canary, again</span></div>
+      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
+<span class="gy">PASS</span> update: API exposes the higher-LSN current state
+<span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
+<span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
+<span class="gy">PASS</span>: Postgres &rarr; Debezium &rarr; Avro/Kafka &rarr; Spark &rarr; ClickHouse &rarr; API</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── s28 · BREAK ─────────────────────────────────────── -->
+<section class="slide deep" id="s28" data-speaker="First and only break in this half. Ten minutes. Remind students the canary id=208 and the guarantee ledger (s13) are the two things worth re-reading before Part two, which moves from theory to hands-on: standing the whole pipeline up with real commands and then breaking it on purpose.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Break 01</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Ten minutes. <em>Then</em> we wire it up.</h1>
+    <div class="timer reveal" id="breakTimer1" data-seconds="600">
+      <div class="timer-face">
+        <span class="timer-disp">10:00</span>
+        <span class="timer-hint">click to start / pause</span>
+      </div>
+      <div class="timer-controls">
+        <button class="timer-btn" data-add="60" type="button">+1 min</button>
+        <button class="timer-btn" data-add="30" type="button">+30 s</button>
+      </div>
+    </div>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Back in ten minutes. Part two starts with the four commands that stand the whole pipeline up.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LESSON 11 DECK — PART 2 FRAGMENT (s30–s72)
+     Spliced after another agent's shell + s01–s28. No doctype/head/body.
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- ─── 30 · PART TWO DIVIDER ─────────────────────────── -->
+<section class="slide deep" id="s30" data-speaker="Frame Part two in one sentence: everything up to now has been architecture and promises; this part is where we point at the running system and prove, hop by hop, that a single order actually makes the trip. Tell students roughly 50 minutes, and that they will be typing commands, not just watching slides. Set the tone: skepticism is the right posture — don't believe a diagram, believe a terminal.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part two &middot; ~50 min</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Prove the <em>golden path.</em></h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Start the stack, then trace one real order through all six boundaries — Postgres, Debezium, Kafka, Spark, ClickHouse, API — and read the value at each hop yourself.</p>
+  </div>
+</section>
+
+<!-- ─── 31 · START AND PREFLIGHT ──────────────────────── -->
+<section class="slide" id="s31" data-speaker="Live-run this before anything else. Three commands, in order: build+start the stack, sync the Python env, then run preflight. Warn them explicitly that the FIRST cold start is slow — pulling Confluent images and Spark resolving its Kafka/Avro jar coordinates over the network — so don't panic and don't Ctrl-C it. Subsequent starts are fast because everything is cached. Run preflight and read the OK lines out loud; if any line isn't OK, stop here and fix it before Part two proceeds.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">start &amp; preflight</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Bring it up, <em>then check it.</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Three commands. Do not skip the third one.</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)" data-copy="docker compose up -d --build">
+      <span class="plabel">1 &middot; build &amp; start every container</span>
+      <span class="pcmd">docker compose up -d --build</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="uv sync">
+      <span class="plabel">2 &middot; sync the python environment</span>
+      <span class="pcmd">uv sync</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="uv run python scripts/preflight.py">
+      <span class="plabel">3 &middot; verify every dependency is reachable</span>
+      <span class="pcmd">uv run python scripts/preflight.py</span>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>The first cold start is large:</strong> Docker pulls the Confluent and Spark image layers, and Spark resolves its Kafka/Avro jar coordinates over the network exactly once. Let it finish. Every start after this one is fast.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 32 · CONNECTOR-INIT EXITED(0) ─────────────────── -->
+<section class="slide" id="s32" data-speaker="Pre-empt the question every cohort asks within the first five minutes: 'why is connector-init dead already?' It isn't dead — it did its one job and stopped. It's a one-shot container whose entire purpose is a single idempotent PUT that registers the Debezium connector config against Kafka Connect, then exits. Exited (0) is a clean exit code, not a crash. If it showed a non-zero exit code or kept restarting, that would be the failure signal to chase. Say this before anyone opens docker ps and panics.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the container that's supposed to be dead</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)"><span class="ink-mono">connector-init</span> exiting is <em>success.</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Students always ask about this one. Answer it before they do.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">docker compose ps</span></div>
+      <div class="code-body">NAME              STATUS
+&hellip;                &hellip;
+connector-init    <span class="gy">Exited (0)</span>  &larr; this is the healthy final state</div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt"><strong><span class="ink-mono">connector-init</span> is a one-shot job, not a service.</strong> It sends a single idempotent PUT to Kafka Connect that registers the Debezium connector config, then exits. It has nothing left to do, so it stops. <span class="term">Exited (0)</span> means it succeeded — a nonzero code or a restart loop would be the actual failure signal.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 33 · TRACE THE CANARY — SIX HOPS MAP ──────────── -->
+<section class="slide" id="s33" data-speaker="This is the map for the whole hour: six boundaries, one order, six ways to look. Walk it left to right without detail yet — detail comes on the next five slides, one hop per slide. Tell them the point isn't to memorize commands, it's to leave knowing where to look when something is wrong in their own project later.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">trace the canary</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Six hops, <em>one order.</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Every boundary below gets its own slide. This is the map.</p>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <tr><th>Hop</th><th>Boundary</th><th>What you inspect</th></tr>
+      <tr><td>&#9312;</td><td>Postgres</td><td>the row itself, and the current WAL position</td></tr>
+      <tr><td>&#9313;</td><td>Debezium</td><td>connector task status</td></tr>
+      <tr><td>&#9314;</td><td>Kafka</td><td>key, value, partition, offset, schema ID</td></tr>
+      <tr><td>&#9315;</td><td>Spark</td><td>batch progress and checkpoint state</td></tr>
+      <tr><td>&#9316;</td><td>ClickHouse</td><td>raw rows vs. <span class="ink-mono">FINAL</span></td></tr>
+      <tr><td>&#9317;</td><td>API</td><td>the full provenance chain in one JSON body</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─── 34 · HOP 1–2: POSTGRES, DEBEZIUM ──────────────── -->
+<section class="slide" id="s34" data-speaker="Hop one and two. In Postgres, TABLE orders is psql shorthand for SELECT * FROM orders — show the canary row sitting there, ordinary and durable, and mention its WAL position is what Debezium is actually replicating from, not the table itself. Then hop to Debezium: curl the connector status endpoint and read the state field out loud — RUNNING/RUNNING means both the connector and its one task are healthy. If either says FAILED, that's the first place to look before touching Kafka at all.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">hop &#9312;&ndash;&#9313;</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Postgres row, <em>then Debezium.</em></h2>
+    <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">&#9312; Postgres</p>
+        <div class="prompt" data-copy="TABLE orders;">
+          <span class="plabel">psql</span>
+          <span class="pcmd">TABLE orders;</span>
+        </div>
+        <p class="sub" style="margin-top:0.4rem">The row, and its position in the WAL — the log Debezium is actually reading.</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">&#9313; Debezium</p>
+        <div class="prompt" data-copy="curl -s http://localhost:18083/connectors/orders-cdc/status">
+          <span class="plabel">connector status</span>
+          <span class="pcmd">curl .../connectors/orders-cdc/status</span>
+        </div>
+        <p class="sub" style="margin-top:0.4rem">Look for <span class="ink-mono">RUNNING/RUNNING</span> — connector state, then task state.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 35 · HOP 3: KAFKA ──────────────────────────────── -->
+<section class="slide" id="s35" data-speaker="Hop three: the Kafka record itself. Point at five things — key, value, partition, offset, and the Confluent schema ID prefixed onto the value bytes. The trap to name explicitly: an offset identifies one event within its partition, full stop. It does NOT tell you the order in which two different orders' events reached current state, because this topic has three partitions and different keys can land on different partitions. Ordering is guaranteed per key within a partition, not globally across the topic.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">hop &#9314; &middot; kafka</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">An offset identifies <em>an event,</em> not an order.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <tr><th>Field</th><th>What it tells you</th></tr>
+      <tr><td>key</td><td>the order's primary key — routes it to a partition</td></tr>
+      <tr><td>value</td><td>the Avro-encoded CDC envelope (before/after/source)</td></tr>
+      <tr><td>partition</td><td>one of <span class="term">3</span> — <span class="ink-mono">cdc.public.orders</span> has 3 partitions</td></tr>
+      <tr><td>offset</td><td>this event's position within <em>its</em> partition only</td></tr>
+      <tr><td>schema ID</td><td>the Confluent registry ID encoded in the value's first 5 bytes</td></tr>
+    </table>
+    <div class="callout danger reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>The offset orders nothing across partitions.</strong> With 3 partitions, two different orders' events can land on different partitions with no relationship between their offsets. Offset identifies an event within its own partition; it is not a global sequence number for current state.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 36 · HOP 4: SPARK — CHECKPOINT ≠ CONSUMER LAG ─── -->
+<section class="slide" id="s36" data-speaker="Hop four, and slow down here — this is the distinction the whole 'offset-head distance' dashboard panel exists to teach. Spark Structured Streaming does NOT use a Kafka consumer group. It tracks its own read progress as offsets written into the Spark checkpoint directory, which lives on a persistent volume specifically so a restart resumes instead of replaying from scratch. Because those offsets are private to the checkpoint and invisible to Kafka's own consumer-group offset API, you cannot point a normal Kafka lag tool at this pipeline and get a real number back — which is exactly why the Grafana panel is labelled offset-head distance and not consumer lag. Naming it correctly is the whole point of this slide.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">hop &#9315; &middot; spark</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Checkpoint offsets are <em>not</em> consumer-group offsets.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Spark tracks its own read progress. Kafka's consumer-group API never sees it.</p>
+    <div class="callout danger reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>These offsets live in the Spark checkpoint, on a persistent volume — they are NOT Kafka consumer-group commits.</strong> That's the entire reason the dashboard metric is called <span class="term">offset-head distance</span> and not <span class="term hot">consumer lag</span>: a standard Kafka lag tool queries consumer-group offsets, and this pipeline never writes any.</div>
+    </div>
+    <p class="lede reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">Why the checkpoint has to be on a persistent volume, not <span class="ink-mono">/tmp</span>: lose it, and Spark has no memory of what it already processed.</p>
+  </div>
+</section>
+
+<!-- ─── 37 · HOP 5: CLICKHOUSE — RAW ROWS VS FINAL ────── -->
+<section class="slide" id="s37" data-speaker="Hop five. Show the raw table with FINAL omitted first — several physical rows can exist for the same order_id, because ReplacingMergeTree only merges duplicate versions in the background, on its own schedule, not the instant a row lands. Then add FINAL and re-run the same query: ClickHouse now merges at read time and returns exactly one row, the highest-version one. If that winning row happens to be a delete marker, say so explicitly: the merge doesn't know about 'delete' as a special case, it's the API layer one hop later that recognizes the marker and turns it into a 404. FINAL fixes duplication; it does not by itself implement soft-delete semantics.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">hop &#9316; &middot; clickhouse</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Raw rows vs. <em><span class="ink-mono">FINAL</span></em></h2>
+    <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">without FINAL</p>
+        <div class="code-block" data-copy="SELECT * FROM lesson11.orders_current WHERE order_id = :id;">
+          <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">clickhouse-client</span></div>
+          <div class="code-body"><span class="r">SELECT</span> * <span class="r">FROM</span> <span class="n">lesson11.orders_current</span>
+<span class="r">WHERE</span> order_id = :id;</div>
+        </div>
+        <p class="sub" style="margin-top:0.4rem">Can return several physical rows — one per version that hasn't merged yet.</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">with FINAL</p>
+        <div class="code-block" data-copy="SELECT * FROM lesson11.orders_current FINAL WHERE order_id = :id;">
+          <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">clickhouse-client</span></div>
+          <div class="code-body"><span class="r">SELECT</span> * <span class="r">FROM</span> <span class="n">lesson11.orders_current</span> <span class="gy">FINAL</span>
+<span class="r">WHERE</span> order_id = :id;</div>
+        </div>
+        <p class="sub" style="margin-top:0.4rem">Merges versions at read time. One row: the highest <span class="ink-mono">version</span>.</p>
+      </div>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>If that winning row is a delete marker,</strong> <span class="ink-mono">FINAL</span> still returns it — it just merges duplicates, it doesn't know "delete" is special. The API is the layer that reads the marker and turns it into a 404.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 38 · HOP 6: API — THE WHOLE CHAIN IN ONE BODY ─── -->
+<section class="slide" id="s38" data-speaker="Hop six, the payoff of the whole trace: one API response, and every hop you just visited by hand is visible in a single JSON body — the source LSN from Postgres, the Kafka partition/offset identity, and the sink-ingest timestamp from ClickHouse. This is what 'provenance' means operationally: not a diagram, a field you can point to in a response you just received. Ask them to find the three fields before you point them out.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">hop &#9317; &middot; api</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">The whole chain, <em>one JSON body.</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Source LSN, Kafka identity, sink-ingest timestamp — all in one response.</p>
+    <div class="code-block reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">GET :18000/orders/{id} &middot; illustrative shape</span></div>
+      <div class="code-body">{
+  <span class="n">"order_id"</span>: 10494,
+  <span class="n">"amount"</span>: 111.11,
+  <span class="n">"discount_code"</span>: <span class="s">"MAGNUM11"</span>,
+  <span class="n">"version"</span>: 34317200,                        <span class="cm">// Debezium source LSN   L1/L5</span>
+  <span class="n">"source_topic"</span>: <span class="s">"cdc.public.orders"</span>,      <span class="cm">// event identity        L6</span>
+  <span class="n">"kafka_partition"</span>: 1, <span class="n">"kafka_offset"</span>: 5314,
+  <span class="n">"source_ts"</span>:   <span class="s">"2026-08-01T04:03:46.551"</span>,  <span class="cm">// Postgres changed</span>
+  <span class="n">"ingested_at"</span>: <span class="s">"2026-08-01T04:03:50.855"</span>   <span class="cm">// ClickHouse could answer</span>
+}
+
+<span class="gy">ingested_at - source_ts = 4.304s</span>  <span class="cm">&lt;- this order's own transit time</span></div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">This is provenance you can point at, not a diagram you have to trust: the same LSN from hop &#9312;, the same partition/offset from hop &#9314;, the same ingest time from hop &#9316; — in one response.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 39 · PREDICT: UPDATE, DELETE, RESTART ─────────── -->
+<section class="slide" id="s39" data-speaker="Take the prediction before revealing anything. Ask: update the order, delete it, then restart the processor — how many rows are now in ClickHouse, and what does the API return? Let people commit to an answer out loud. The trap most people fall into is assuming a restart plus replay means duplication is a bug; it's the opposite — replay landing as MORE physical rows is proof the pipeline is doing exactly what versioned current-state was designed to do. Reveal only after a few guesses.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">predict</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Update it. Delete it. <em>Restart the processor.</em></h2>
+    <p class="lede reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">Predict: how many rows are now in ClickHouse for that order, and what does the API return?</p>
+    <div class="spoiler reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <table class="dtable">
+        <tr><th>Question</th><th>Answer</th></tr>
+        <tr><td>Raw row count</td><td class="cool">grows — replay is real and physical</td></tr>
+        <tr><td>Current state</td><td class="cool">stays correct — <span class="ink-mono">FINAL</span> still resolves to the highest version</td></tr>
+        <tr><td>The deleted order</td><td>hidden by the winning delete marker</td></tr>
+        <tr><td>API response</td><td class="hot">404</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 40 · DASHBOARD AS CAUSAL GRAPH ────────────────── -->
+<section class="slide" id="s40" data-speaker="Before showing any labels, ask the class to state the direction of causality out loud: which hop's motion causes the next hop to move? Only after they commit to an order, reveal the labeled version. The point isn't memorizing five box names — it's that reading a dashboard requires knowing which panel is upstream of which, otherwise you chase the wrong panel first during an incident.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">read the dashboard as a graph</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Direction <em>before</em> labels.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">State the causal order out loud before the labels are revealed.</p>
+    <div class="flow reveal" style="justify-content:center;margin-top:clamp(1rem,2vh,1.4rem)">
+      <div class="box">1</div><span class="arrow">&rarr;</span>
+      <div class="box">2</div><span class="arrow">&rarr;</span>
+      <div class="box">3</div><span class="arrow">&rarr;</span>
+      <div class="box">4</div><span class="arrow">&rarr;</span>
+      <div class="box">5</div>
+    </div>
+    <div class="spoiler reveal" style="margin-top:clamp(1rem,2vh,1.4rem)">
+      <div class="flow" style="justify-content:center">
+        <div class="box">Connect produces</div><span class="arrow">&rarr;</span>
+        <div class="box">Kafka head advances</div><span class="arrow">&rarr;</span>
+        <div class="box">Spark consumes</div><span class="arrow">&rarr;</span>
+        <div class="box">ClickHouse becomes queryable</div><span class="arrow">&rarr;</span>
+        <div class="box" style="border-color:var(--gold);color:var(--gold)">freshness &rarr; 0</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 41 · CHECKPOINT: RUN THE VERIFIER ─────────────── -->
+<section class="slide" id="s41" data-speaker="This is deliverable evidence #1 — tell them explicitly to capture this output for their write-up. Run the verifier live, read each PASS line out loud and connect it back to a hop from this part: insert proves hop 1-3 wired correctly, update proves LSN-as-version ordering, the nullable-update line is the one people don't expect — a NULL update must not resurrect an older non-null value — and the delete line is the 404 they just predicted two slides ago. The final PASS line is the whole pipeline stated as one sentence.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">checkpoint</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Run the verifier. <em>Save this output.</em></h2>
+    <p class="sub reveal" style="margin-top:0.5rem">This is deliverable evidence #1 — capture it for the write-up.</p>
+    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="uv run python scripts/verify.py">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python scripts/verify.py</span>
+    </div>
+    <div class="code-block reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="code-header"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div><span class="code-label">output</span></div>
+      <div class="code-body"><span class="gy">PASS</span> insert: id=208 event=cdc.public.orders:1:80
+<span class="gy">PASS</span> update: API exposes the higher-LSN current state
+<span class="gy">PASS</span> nullable update: NULL did not resurrect the before image
+<span class="gy">PASS</span> delete: higher-LSN marker wins and API returns 404
+<span class="gy">PASS</span>: Postgres &rarr; Debezium &rarr; Avro/Kafka &rarr; Spark &rarr; ClickHouse &rarr; API</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 42 · BREAK ─────────────────────────────────────── -->
+<section class="slide deep" id="s42" data-speaker="Ten-minute break. Tease what's next: Part three breaks the thing they just proved works — first gently, by evolving the schema, then for real, by inducing backpressure on purpose. Tell them to actually stand up.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Break</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">You proved it works. <em>Now break it.</em></h1>
+    <div class="timer reveal" id="breakTimer1" data-seconds="600">
+      <div class="timer-face">
+        <span class="timer-disp">10:00</span>
+        <span class="timer-hint">click to start / pause</span>
+      </div>
+      <div class="timer-controls">
+        <button class="timer-btn" data-add="60" type="button">+1 min</button>
+        <button class="timer-btn" data-add="30" type="button">+30 s</button>
+      </div>
+    </div>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">Next: evolve the schema live, then push the pipeline into real backpressure on purpose.</p>
+  </div>
+</section>
+
+<!-- ─── 50 · PART THREE DIVIDER ────────────────────────── -->
+<section class="slide deep" id="s50" data-speaker="Frame Part three in one sentence: a pipeline that only ever runs under ideal conditions hasn't been proven, it's been demoed. This part does two things on purpose — evolve the schema safely while load keeps flowing, then deliberately induce backpressure and watch the dashboard tell the truth about it. ~50 minutes.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Part three &middot; ~50 min</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Evolve it. Then make it <em>fall behind.</em></h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">A schema change under live load, on purpose. Real backpressure, on purpose. Then the one dashboard slide that trips up everyone the first time they see it.</p>
+  </div>
+</section>
+
+<!-- ─── 51 · PREDICT: DISCOUNT_CODE ORDER ─────────────── -->
+<section class="slide" id="s51" data-speaker="Take the prediction before explaining expand/contract. The instinctive plan is always 'add discount_code to Postgres first, since that's where the feature lives' — let someone say that, then ask what happens downstream. The point: a green pipeline dashboard proves events are flowing, it does NOT prove any particular field survived the trip. Either an old reader silently drops a field it doesn't recognize, or — worse — a reader with a stricter contract just fails outright against a sink that hasn't caught up.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">predict</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Add the column in Postgres <em>first.</em> What breaks?</h2>
+    <p class="lede reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">You add <span class="ink-mono">discount_code</span> to Postgres first — that's where the feature lives. Predict what happens downstream.</p>
+    <div class="spoiler reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <div class="callout danger">
+        <div class="ico" style="color:var(--red)">!</div>
+        <div class="ctxt">An old reader silently drops the field it doesn't recognize — or a new reader fails outright against a sink schema that hasn't caught up. <strong>"The pipeline is green" does not prove the field arrived.</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 52 · EXPAND-FIRST MIGRATION, THE STEPS ────────── -->
+<section class="slide" id="s52" data-speaker="Walk this table top to bottom before running anything. The one sentence to land: downstream expands FIRST — ClickHouse and the schema registry get told about the new field before Postgres is allowed to send it. That ordering is the entire migration strategy. Point at step 6 specifically: Spark discovers the new schema ID mid-stream, with no restart, because it re-checks the schema ID on every batch it reads.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">expand-first migration</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Downstream expands <em>first.</em></h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <tr><th>Step</th><th>Action</th></tr>
+      <tr><td>1</td><td>add nullable <span class="ink-mono">discount_code</span> to ClickHouse</td></tr>
+      <tr><td>2</td><td>prove an old-schema CDC record still reaches the sink</td></tr>
+      <tr><td>3</td><td>set subject compatibility to <span class="term">FULL</span></td></tr>
+      <tr><td>4</td><td>add the column in Postgres</td></tr>
+      <tr><td>5</td><td>Debezium registers a new Avro writer schema</td></tr>
+      <tr><td>6</td><td class="cool">Spark discovers the new schema ID — no restart</td></tr>
+      <tr><td>7</td><td>prove <span class="ink-mono">MAGNUM11</span> reaches ClickHouse and the API</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─── 53 · RUN IT: MIGRATE_DISCOUNT_CODE.PY ─────────── -->
+<section class="slide" id="s53" data-speaker="Run it live, load generator still running in another pane if possible. While it runs, point at the pipeline_schema_ids_in_batch Grafana panel and watch it step from 1 to 2 — that's the moment Spark's reader saw a batch containing records under the new schema ID for the first time. Emphasize what does NOT happen: nothing restarts. No pod bounces, no consumer regroups. That's the entire payoff of expand-first plus FULL compatibility.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">run it</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Watch the schema-ID panel <em>step.</em></h2>
+    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="uv run python scripts/migrate_discount_code.py">
+      <span class="plabel">run it</span>
+      <span class="pcmd">uv run python scripts/migrate_discount_code.py</span>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">Watch the <span class="ink-mono">pipeline_schema_ids_in_batch</span> panel step from <strong>1 to 2</strong> while load keeps flowing. <strong>Nothing restarts.</strong> That's expand-first plus <span class="term">FULL</span> compatibility doing its job.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 54 · REGISTRY V1 VS V2 ─────────────────────────── -->
+<section class="slide" id="s54" data-speaker="Show the diff, and be blunt about how small it is: one nullable field with a default is the entire delta between version 1 and version 2. Then run the curl and show the registry now lists both versions. The line to land hard here: a schema registry stores contracts — it does not migrate consumers for you. Both versions decoding correctly in the SAME running Spark query is the proof; nobody restarted anything to make that true.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the registry, before &amp; after</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">One nullable field. <em>That's the whole diff.</em></h2>
+    <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.4rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">v1</p>
+        <p class="lede">no <span class="ink-mono">discount_code</span> field</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">v2</p>
+        <p class="lede">+ <span class="ink-mono">discount_code</span>, nullable, with a default</p>
+      </div>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.9rem,1.8vh,1.3rem)" data-copy="curl -s http://localhost:18081/subjects/cdc.public.orders-value/versions">
+      <span class="plabel">registry now has</span>
+      <span class="pcmd">curl .../subjects/cdc.public.orders-value/versions &rarr; [1, 2]</span>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt"><strong>A schema registry stores contracts; it does not migrate consumers for you.</strong> Both versions decode correctly in the <em>same</em> running Spark query — that's what proves the contract held, not the registry entry by itself.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 55 · EXPAND / CONTRACT SCOPE ──────────────────── -->
+<section class="slide" id="s55" data-speaker="Name the pattern explicitly: this is expand/contract, a standard schema-evolution technique, and Lesson 11 only performs the additive expand half. Say clearly why the contract half — removing the old path, deprecating the field nobody reads anymore, coordinating that every consumer has actually cut over — is deliberately out of scope: it's a production migration problem with real outage risk, not a mechanism this lesson can safely demo live. Contract is where the outages live, because you're removing something a consumer might still depend on.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">expand / contract</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">We only did the <em>expand</em> half.</h2>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <li>What you just ran is <strong>expand</strong>: add, additive, backward-compatible, safe to run under live load.</li>
+      <li><strong>Contract</strong> — removing the old field, forcing every consumer off it — is deliberately out of scope today.</li>
+    </ul>
+    <div class="callout danger reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt"><strong>Contract is where the outages live.</strong> Removing something means proving every consumer has already stopped depending on it — that's a coordination and rollback problem, not a schema-registry mechanism, and it's a real production migration, not a lesson demo.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 56 · THE BACKPRESSURE EXPERIMENT ──────────────── -->
+<section class="slide" id="s56" data-speaker="Set this up as an experiment, not just a command. Recreate the stream-processor with SINK_DELAY_SECONDS=10 injected — say explicitly that this env var is a lesson-only fault-injection point, it does not exist in any production code path, it's there specifically so you can manufacture backpressure on demand. Then fire a rate-100 burst for 30 seconds and watch Grafana live. Recreate again without the env var to remove the injected delay and watch recovery.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the backpressure experiment</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Inject a delay. <em>Then hit it hard.</em></h2>
+    <div class="prompt reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)" data-copy="SINK_DELAY_SECONDS=10 docker compose up -d --force-recreate stream-processor">
+      <span class="plabel">1 &middot; inject a 10s sink delay</span>
+      <span class="pcmd">SINK_DELAY_SECONDS=10 docker compose up -d --force-recreate stream-processor</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="uv run python scripts/load_generator.py --rate 100 --duration 30">
+      <span class="plabel">2 &middot; burst load</span>
+      <span class="pcmd">uv run python scripts/load_generator.py --rate 100 --duration 30</span>
+    </div>
+    <div class="prompt reveal" style="margin-top:clamp(0.5rem,1vh,0.8rem)" data-copy="docker compose up -d --force-recreate stream-processor">
+      <span class="plabel">3 &middot; remove the delay, recover</span>
+      <span class="pcmd">docker compose up -d --force-recreate stream-processor</span>
+    </div>
+    <div class="callout note reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><span class="ink-mono">SINK_DELAY_SECONDS</span> is a lesson-only injection point — it does not exist in any production code path. It exists so you can manufacture backpressure on demand instead of waiting for it to happen.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 57 · PREDICT: FOUR CURVES ──────────────────────── -->
+<section class="slide" id="s57" data-speaker="Before switching to Grafana, make everyone commit to a prediction on paper or out loud: sketch the shape of four curves under the delay+burst you just triggered. Don't reveal the real dashboard yet — the point of this slide is the guess, the next slide is the check. Four curves: arrival vs processed throughput, offset-head distance, batch duration against the 5-second trigger, and freshness.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">predict</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Sketch four curves <em>before</em> you look.</h2>
+    <p class="lede reveal" style="margin-top:clamp(0.7rem,1.4vh,1.1rem)">Predict the shape of each, before opening Grafana:</p>
+    <ul class="bullets reveal" style="margin-top:clamp(0.6rem,1.2vh,0.9rem)">
+      <li>arrival throughput vs. processed throughput</li>
+      <li>offset-head distance</li>
+      <li>batch duration, against the 5s trigger</li>
+      <li>freshness</li>
+    </ul>
+    <div class="spoiler reveal" style="margin-top:clamp(0.9rem,1.7vh,1.3rem)">
+      <p class="lede">Rough shape: two throughput lines that separate, a distance that climbs, a duration that crosses a flat 5s line, a freshness that ages — then all four reconverge once the delay is removed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 58 · WHAT YOU SHOULD ACTUALLY SEE ─────────────── -->
+<section class="slide" id="s58" data-speaker="Now open the real dashboard and confirm each of the four predictions against what actually happened. Land the recovery condition as a hard rule: recovery requires drain rate greater than arrival rate — if the pipeline can only ever process at or below the rate it's arriving, the backlog never shrinks, full stop, no amount of waiting fixes it. Then call back Lesson 9 explicitly: they measured with their own hands that Spark's floor is max(trigger, batch_time) — that's exactly why batch duration crossing the 5s trigger is the moment queueing starts, not some other threshold. Ground truth from the recorded run (SINK_DELAY_SECONDS=10, --rate 200 --duration 60): offset-head distance 0 -> 455 -> 843 -> 1210 -> 1603 -> 1957 peak then down; end-to-end latency 14s -> 62s; p95 batch duration ~19s against the 5s trigger; back to 0 within ~40s of removing the delay. Peak lag crosses the 1000-record alert threshold so Lesson11KafkaLagHigh fires for real. The inflection is the teaching moment: lag peaks and falls the instant arrival stops, because drain finally exceeds arrival - make them name that before you point at it.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">what you should actually see</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Recovery needs <em>drain rate &gt; arrival rate.</em></h2>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <li>arrival rises <strong>above</strong> processed throughput</li>
+      <li>offset-head distance <strong>grows</strong></li>
+      <li>batch duration <strong>crosses the 5s trigger</strong> — the moment batches start queueing</li>
+      <li>freshness <strong>ages</strong></li>
+    </ul>
+    <div class="callout danger reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--red)">!</div>
+      <div class="ctxt">Recovery requires <strong>drain rate &gt; arrival rate</strong> — otherwise the backlog never catches up, no matter how long you wait.</div>
+    </div>
+    <p class="sub reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)"><strong>Callback &middot; Lesson 9:</strong> Spark's floor is <span class="ink-mono">max(trigger, batch_time)</span> — you measured that yourselves. That's exactly why crossing the 5s trigger is the queueing threshold, not some other number.</p>
+  </div>
+</section>
+
+<!-- ─── 59 · THE IDLE-SOURCE TRAP ──────────────────────── -->
+<section class="slide" id="s59" data-speaker="This is the sharpest point in Part three — slow down and give it real time. These two numbers are real, observed on the running system while it was perfectly healthy and nobody was writing to it: freshness at 2218 seconds — over 37 minutes stale — while transit sits at -1, meaning nothing to measure. Ask: is the pipeline broken? It is not. Nobody placed an order. Staleness climbing on its own proves nothing is wrong; it can just mean the source went idle. Then show what both numbers do under live load: they converge to roughly the same ~13.8 seconds. The teaching point: one metric alone will mislead you in one direction or the other — that's precisely why the dashboard plots both freshness and transit side by side, never just one.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal hot">the idle-source trap</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Staleness climbing does <em>not</em> mean broken.</h2>
+    <p class="sub reveal" style="margin-top:0.5rem">Real numbers, observed while the pipeline was perfectly healthy and nobody was writing.</p>
+    <div class="two-col reveal" style="margin-top:clamp(1rem,2vh,1.5rem)">
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.8rem,1.6vw,1.2rem)">
+        <p class="col-label" style="color:var(--red)">idle source &middot; ~37 min nobody wrote</p>
+        <div class="stat red">2218.394</div>
+        <div class="stat-label">api_data_freshness_seconds</div>
+        <div class="stat" style="margin-top:0.6rem">-1</div>
+        <div class="stat-label">api_pipeline_transit_seconds</div>
+      </div>
+      <div class="col" style="background:var(--panel);border-radius:6px;padding:clamp(0.8rem,1.6vw,1.2rem)">
+        <p class="col-label" style="color:var(--gold)">under live load</p>
+        <div class="stat cool">~13.8</div>
+        <div class="stat-label">api_data_freshness_seconds</div>
+        <div class="stat cool" style="margin-top:0.6rem">~13.8</div>
+        <div class="stat-label">api_pipeline_transit_seconds</div>
+      </div>
+    </div>
+    <div class="callout proof reveal" style="margin-top:clamp(0.9rem,1.7vh,1.2rem)">
+      <div class="ico" style="color:var(--gold)">&#10003;</div>
+      <div class="ctxt">Freshness climbs whenever nobody is writing — <strong>an idle source is not a failure.</strong> Transit stays flat while idle and only rises under real backpressure. One metric alone will mislead you; that's why the dashboard plots both.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 60 · THREE-METRIC INCIDENT DRILL ──────────────── -->
+<section class="slide" id="s60" data-speaker="Hands-on exercise, 5 minutes then discuss as a group. Pair students up. Give each pair a dashboard screenshot with one panel deliberately hidden — they don't get to see everything. Their job: name which boundary is failing from the panels they DO have, and state the ONE additional metric they'd request to disambiguate between competing explanations. Circulate while they work. The debrief point: naming the missing metric is the actual skill — anyone can stare at a red panel, the job is knowing what evidence would settle the question.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">exercise &middot; 5 min</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Name the boundary. <em>Request one metric.</em></h2>
+    <ul class="bullets reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <li>Pair up. You get a dashboard screenshot with <strong>one panel hidden.</strong></li>
+      <li>Name which boundary is failing, using only what you can see.</li>
+      <li>State the <strong>one</strong> missing metric that would disambiguate the cause.</li>
+      <li>5 minutes, then we discuss as a group.</li>
+    </ul>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt">The skill isn't spotting a red panel — it's knowing which single additional number would settle which of two explanations is true.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 61 · THE LEDGER, REVISITED ────────────────────── -->
+<section class="slide" id="s61" data-speaker="Bring back the guarantee ledger from earlier and make them state, boundary by boundary, what they can now claim from direct experience rather than from a diagram. Land the two lines hard, back to back: you may claim effectively-once current state — versioned rows plus FINAL make replay harmless, you proved that two slides after the predict-and-restart exercise. You may NOT claim a distributed exactly-once transaction — atomicity ends at the system boundary, nothing here spans Postgres, Kafka, and ClickHouse inside one commit.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">the ledger, revisited</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">What you can <em>honestly</em> claim now.</h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.7rem,1.4vh,1rem)">
+      <tr><th>Boundary</th><th>Durable position</th><th>Honest guarantee</th></tr>
+      <tr><td>Postgres &rarr; Debezium</td><td>WAL LSN + replication slot</td><td>replayable CDC; normally at least once</td></tr>
+      <tr><td>Debezium &rarr; Kafka</td><td>topic, partition, offset; schema ID</td><td>durable ordered log per partition</td></tr>
+      <tr><td>Kafka &rarr; Spark</td><td>offsets in the Spark checkpoint</td><td>exactly-once progress <em>inside Spark</em></td></tr>
+      <tr><td>Spark &rarr; ClickHouse</td><td>LSN as version; (partition, offset) as identity</td><td>sink can be written more than once</td></tr>
+      <tr><td>ClickHouse &rarr; API</td><td>query result at a known ingest time</td><td>current state, measurable staleness</td></tr>
+    </table>
+    <div class="two-col reveal" style="margin-top:clamp(0.9rem,1.7vh,1.2rem)">
+      <div class="col">
+        <p class="col-label" style="color:var(--gold)">you may claim</p>
+        <p class="lede">effectively-once current state</p>
+      </div>
+      <div class="col">
+        <p class="col-label" style="color:var(--red)">you may NOT claim</p>
+        <p class="lede">a distributed exactly-once transaction</p>
+      </div>
+    </div>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)"><strong>Atomicity ends at the system boundary.</strong> Nothing here commits Postgres, Kafka, and ClickHouse together.</p>
+  </div>
+</section>
+
+<!-- ─── 62 · CLOSE INTO LESSON 12 ──────────────────────── -->
+<section class="slide deep" id="s62" data-speaker="This is the close of the technical content — make it land, then stop talking and let it sit for a second before moving to the deliverable slide. Lesson 11 proved a healthy pipeline can be understood and evolved — every hop was inspectable, the migration was safe because it was additive, backpressure was legible on a dashboard instead of a mystery. Lesson 12 is the opposite exercise: this exact system, handed back broken in six places, and they don't get to choose which six. Everything in Part two of today — the six-hop trace, reading the dashboard as a causal graph, the two freshness numbers — is the toolkit they'll need next time, not just today's content.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,880px);margin:0 auto;align-items:center;text-align:center;justify-content:center;">
+    <div class="kicker reveal">Closing into Lesson 12</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem);font-size:clamp(1.9rem,5.2vw,3.8rem)">A healthy pipeline can be <em>understood and evolved.</em></h1>
+    <p class="lede reveal" style="margin-top:clamp(0.9rem,2vh,1.4rem);max-width:680px;margin-left:auto;margin-right:auto;">Lesson 12 hands you this exact system, broken in six places — and you don't get to choose which six.</p>
+  </div>
+</section>
+
+<!-- ─── 63 · THE DELIVERABLE ──────────────────────────── -->
+<section class="slide" id="s63" data-speaker="The actual submission checklist. Read it out as a checklist, not prose: a running end-to-end pipeline they can demo, the verifier's PASS output saved from Part two as evidence #1, a Grafana dashboard screenshot that actually shows lag/throughput/latency at every stage (not just one panel), and a short write-up covering both the schema migration and the backpressure run. Repo, README, AGENTS.md, submitted via PR — same format as every lesson this course.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal">the deliverable</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">What you <em>submit.</em></h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <tr><th>Item</th><th>What it proves</th></tr>
+      <tr><td>Running end-to-end pipeline</td><td>the golden path, demoed live</td></tr>
+      <tr><td>Verifier output</td><td>evidence #1 — saved from Part two</td></tr>
+      <tr><td>Grafana dashboard</td><td>lag / throughput / latency at every stage</td></tr>
+      <tr><td>Short write-up</td><td>the migration, and the backpressure run</td></tr>
+    </table>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">Repo + README + <span class="ink-mono">AGENTS.md</span>, submitted via PR — same format as every lesson.</p>
+  </div>
+</section>
+
+<!-- ─── 70 · ANNEX DIVIDER ─────────────────────────────── -->
+<section class="slide deep" id="s70" data-speaker="Short divider before two closing 'what we didn't do and why' slides. These aren't padding — they're proof of judgment, the same skill Lesson 10 closed on: knowing when NOT to add a tool.">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-dot"></div>
+  <div class="geo geo-line"></div>
+  <div class="slide-content" style="max-width:min(92vw,900px);margin:0 auto;">
+    <div class="kicker reveal">Annex</div>
+    <h1 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">What we left <em>out.</em></h1>
+    <p class="sub reveal" style="margin-top:clamp(0.8rem,1.5vh,1.2rem)">And what production hardening this stack still doesn't do.</p>
+  </div>
+</section>
+
+<!-- ─── 71 · DELIBERATELY LEFT OUT ─────────────────────── -->
+<section class="slide" id="s71" data-speaker="Walk each row and make the reasoning explicit, not just the tool name — this is a judgment slide, not a trivia slide. CockroachDB from Lesson 2: distribution wasn't the bottleneck here, a single Postgres node was never the constraint. DuckDB from Lessons 3/4: batch OLAP, not a serving layer — wrong shape for an API that needs live current state. Airflow/Dagster from Lesson 4: orchestration, not streaming — nothing here runs on a schedule. Flink from Lesson 9: they measured it themselves, 7.6s versus Spark's 8.0s at a 2s trigger — not enough of a gap to justify a second streaming runtime crammed into an 8 GB box. Close by echoing Lesson 10's own closing line, since it's the same discipline applied again.">
+  <div class="slide-content" style="max-width:min(92vw,1050px);margin:0 auto;">
+    <div class="section-marker reveal">deliberately left out</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Adding containers would not have <em>strengthened the argument.</em></h2>
+    <table class="dtable reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <tr><th>Tool</th><th>Lesson</th><th>Why it's out</th></tr>
+      <tr><td>CockroachDB</td><td>2</td><td>distribution isn't the bottleneck here</td></tr>
+      <tr><td>DuckDB</td><td>3 / 4</td><td>batch OLAP, not a serving layer</td></tr>
+      <tr><td>Airflow / Dagster</td><td>4</td><td>orchestration, not streaming</td></tr>
+      <tr><td>Flink</td><td>9</td><td>measured 7.6s vs. Spark's 8.0s at a 2s trigger — not worth a second runtime in an 8 GB box</td></tr>
+    </table>
+    <div class="callout note reveal" style="margin-top:clamp(0.8rem,1.5vh,1.1rem)">
+      <div class="ico" style="color:var(--gold)">&#9432;</div>
+      <div class="ctxt"><strong>Callback &middot; Lesson 10's closing line:</strong> "Ten lessons, one row. &hellip; The skill was never the tools. It was measuring whether you needed them."</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 72 · PRODUCTION HARDENING NOT DONE ────────────── -->
+<section class="slide" id="s72" data-speaker="Closing honesty slide, same convention as Lesson 10's caveats slide. Read the list plainly — these are not hidden flaws, they're explicit scope cuts, and naming them out loud is part of the deliverable's honesty. Schema contract tests in CI would have caught an incompatible change before it shipped, not just after. Dead-letter handling matters because right now an undecodable record has nowhere to go. Connector and slot monitoring matters because a stuck replication slot silently grows the WAL until disk fills. Single-broker Kafka and unreplicated ClickHouse mean today's setup has no tolerance for losing a node. Retention sizing tied to worst-case recovery time is what stops a long outage from also losing history. And the contract half of expand/contract — removing an old field safely — is the migration risk this lesson explicitly didn't touch.">
+  <div class="slide-content" style="max-width:min(92vw,1000px);margin:0 auto;">
+    <div class="section-marker reveal hot">production hardening this stack does NOT do</div>
+    <h2 class="reveal" style="margin-top:clamp(0.6rem,1.5vh,1rem)">Name the gaps <em>out loud.</em></h2>
+    <ul class="bullets hot reveal" style="margin-top:clamp(0.8rem,1.6vh,1.2rem)">
+      <li>schema contract tests in CI</li>
+      <li>dead-letter handling for undecodable records</li>
+      <li>connector / slot monitoring and slot-growth alerts</li>
+      <li>multi-broker Kafka with RF &gt; 1</li>
+      <li>ClickHouse replication</li>
+      <li>retention sizing tied to worst-case recovery time</li>
+      <li>the contract half of expand/contract</li>
+    </ul>
+  </div>
+</section>
+
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const bar=document.getElementById('progressBar');
+const io=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      const i=slides.indexOf(e.target);
+      bar.style.width=((i+1)/slides.length*100)+'%';
+    }
+  });
+},{threshold:0.5});
+slides.forEach(s=>io.observe(s));
+
+function go(n){const i=Math.max(0,Math.min(slides.length-1,n));slides[i].scrollIntoView({behavior:'smooth'});}
+function current(){
+  let best=0,bestTop=Infinity;
+  slides.forEach((s,i)=>{const t=Math.abs(s.getBoundingClientRect().top);if(t<bestTop){bestTop=t;best=i;}});
+  return best;
+}
+window.addEventListener('keydown',(e)=>{
+  if(['ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();go(current()+1);}
+  else if(['ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(current()-1);}
+  else if(e.key==='Home'){e.preventDefault();go(0);}
+  else if(e.key==='End'){e.preventDefault();go(slides.length-1);}
+  else if(e.key==='r'||e.key==='R'){slides[current()].querySelectorAll('.spoiler').forEach(s=>s.classList.add('revealed'));}
+});
+document.querySelectorAll('.spoiler').forEach(s=>s.addEventListener('click',()=>s.classList.add('revealed')));
+
+// copy buttons for prompts and code blocks
+document.querySelectorAll('[data-copy]').forEach(block => {
+  const header = block.querySelector('.code-header, .plabel');
+  if (!header) return;
+  const btn = document.createElement('button');
+  btn.className = 'code-copy';
+  btn.type = 'button';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(block.getAttribute('data-copy') || '').then(() => {
+      btn.textContent = 'copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500);
+    }).catch(() => { btn.textContent = 'failed'; setTimeout(() => btn.textContent = 'copy', 1500); });
+  });
+  header.appendChild(btn);
+});
+
+// break timers
+(function(){
+  function fmt(s){
+    const m = Math.floor(s/60).toString().padStart(2,'0');
+    const sec = (s%60).toString().padStart(2,'0');
+    return m+':'+sec;
+  }
+  document.querySelectorAll('.timer').forEach(timer=>{
+    const face = timer.querySelector('.timer-face');
+    const disp = timer.querySelector('.timer-disp');
+    const btns = timer.querySelectorAll('[data-add]');
+    if(!face || !disp) return;
+    let remaining = parseInt(timer.dataset.seconds,10) || 300;
+    let interval = null;
+    let running = false;
+    function update(){ disp.textContent = fmt(remaining); }
+    function tick(){
+      if(remaining>0){ remaining--; update(); }
+      if(remaining<=0){ stop(); timer.classList.add('done'); }
+    }
+    function start(){ if(running) return; running=true; timer.classList.add('running'); interval=setInterval(tick,1000); }
+    function stop(){ running=false; timer.classList.remove('running'); if(interval){ clearInterval(interval); interval=null; } }
+    face.addEventListener('click',()=>{ if(running) stop(); else if(remaining>0) start(); });
+    btns.forEach(b=>b.addEventListener('click',()=>{ remaining += parseInt(b.dataset.add,10); update(); if(!running && remaining>0) start(); }));
+    update();
+  });
+})();
+</script>
+</body>
+</html>

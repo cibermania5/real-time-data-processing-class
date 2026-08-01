@@ -1,0 +1,7 @@
+.venv/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+*.py[cod]
+checkpoints/
+data/

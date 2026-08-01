@@ -1,0 +1,26 @@
+groups:
+  - name: lesson11-pipeline
+    rules:
+      - alert: Lesson11TargetDown
+        expr: up{job=~"stream-processor|api|clickhouse"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is unavailable"
+
+      - alert: Lesson11KafkaLagHigh
+        expr: pipeline_kafka_lag_records > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The lesson 11 processor is more than 1,000 records behind"
+
+      - alert: Lesson11BatchSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(pipeline_batch_duration_seconds_bucket[5m]))) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spark micro-batches have taken over 10 seconds"
