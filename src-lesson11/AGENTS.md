@@ -44,6 +44,12 @@ with roughly 8 GB RAM.
 The current local Docker volumes are therefore already migrated to schema v2.
 `scripts/migrate_discount_code.py` is idempotent and detects that state.
 
+**Cold-start rehearsal (2026-07-31).** The entire lesson has since been reproduced
+from destroyed volumes — see item 1 under "Remaining work". Every init path,
+including the first-run-only branch of the migration, is now verified rather than
+inferred. Rebuilding the Spark image and re-resolving its Maven jars added roughly
+a minute; budget for it before class rather than during.
+
 ## Worktree safety
 
 `src-lesson11/` is currently an untracked directory in the parent repository.
@@ -275,13 +281,16 @@ change.
 
 ## Remaining work / next useful agent tasks
 
-1. Run one explicitly approved **clean-volume rehearsal** (`down -v`, then cold
-   `up`) to prove the final init path from v1 without relying on the already-migrated
-   local volumes. This has not been repeated since the final fixes because it deletes
-   the verified state and Spark Ivy cache. **This is the only significant unverified
-   path.** Note that `sql/postgres-init.sql` and `sql/clickhouse-init.sql` now declare
-   `NUMERIC(10,2)` / `Decimal(10,2)`; existing volumes still carry the old `(12,2)`
-   and both work, but only a clean rehearsal exercises the new DDL.
+1. ~~Run one explicitly approved clean-volume rehearsal.~~ **Done, 2026-07-31.**
+   `down -v` then a cold `up -d --build` reproduced the whole lesson from nothing:
+   fresh DDL came up correct (`numeric(10,2)` / `Decimal(10, 2)`, no
+   `discount_code`), `topic-init` and `connector-init` both `Exited (0)`, preflight
+   all OK, and the v1 verifier passed with the nullable-update step correctly
+   skipped. The migration then ran **under live load** and exercised step `2/4`
+   — the old-schema-still-flows proof — which had never run before because earlier
+   volumes were already expanded. Registry ended at `[1, 2]` with
+   `compatibilityLevel: FULL`, the post-migration verifier passed all four steps,
+   and source and sink agreed exactly (264 rows / 62,964.77).
 2. ~~Run and record the controlled backpressure exercise.~~ **Done.** With
    `SINK_DELAY_SECONDS=10` and `--rate 200 --duration 60`: offset-head distance
    `0 → 1957` peak (crossing the 1,000 alert threshold), end-to-end latency
