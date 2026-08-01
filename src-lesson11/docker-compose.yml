@@ -80,6 +80,10 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
       SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
       SCHEMA_REGISTRY_HEAP_OPTS: -Xms128m -Xmx256m
+      # Lets dashboard.html read the registry from a browser. Lesson-only: a
+      # production registry does not answer arbitrary origins.
+      SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN: "*"
+      SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_METHODS: "GET,OPTIONS"
     ports:
       - "18081:8081"
     healthcheck:
@@ -148,6 +152,10 @@ services:
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
       CONNECT_LOG4J_ROOT_LOGLEVEL: WARN
+      # Lets dashboard.html read connector status from a browser. Lesson-only:
+      # the Connect REST API is an admin surface, not a public one.
+      CONNECT_ACCESS_CONTROL_ALLOW_ORIGIN: "*"
+      CONNECT_ACCESS_CONTROL_ALLOW_METHODS: "GET,OPTIONS"
       KAFKA_HEAP_OPTS: -Xms256m -Xmx640m
     ports:
       - "18083:8083"

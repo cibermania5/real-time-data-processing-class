@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 11 · Trace one order across seven boundaries</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Light theme, but the same semantics as slides/lesson-11.html: green =
+   durable/committed, orange = in flight / not here yet, red = the boundary
+   itself is broken. Every accent is darkened until it passes contrast as text
+   on white — the deck's mint and orange are readable on black, not on paper. */
+:root{
+  /* Page a touch grayer than the cards, so white panels still read as panels
+     when a projector flattens everything toward white. */
+  --bg:#f3f6f9; --panel:#ffffff; --panel2:#eaf0f5; --line:#d3dde6;
+  --text:#121a24; --soft:#48586a; --muted:#62717f;
+  --mint:#0f7f5c; --mint-strong:#0b6a4d;
+  --mint-soft:rgba(15,127,92,0.08); --mint-dim:rgba(15,127,92,0.35);
+  --orange:#b8501c; --orange-strong:#9a4116;
+  --orange-soft:rgba(184,80,28,0.09); --orange-dim:rgba(184,80,28,0.35);
+  --red:#c02a45; --red-soft:rgba(192,42,69,0.07);
+  --code-bg:#eef3f8;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:clamp(13px,0.95vw,15px);line-height:1.5;padding:clamp(1rem,2vw,2rem)}
+h1{font-size:1.5em;font-weight:700;letter-spacing:-0.02em}
+h2{font-size:1.02em;font-weight:600}
+a{color:var(--mint)}
+code,pre,input,button,.mono{font-family:var(--mono)}
+
+/* ── header / controls ───────────────────────────────────────────── */
+header.top{display:flex;flex-wrap:wrap;gap:1rem;align-items:baseline;
+  justify-content:space-between;margin-bottom:0.9rem}
+.kicker{font-family:var(--mono);font-size:0.72em;letter-spacing:0.16em;
+  text-transform:uppercase;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:0.7rem 0.85rem;margin-bottom:1rem}
+label.field{display:flex;align-items:center;gap:0.45rem;font-size:0.85em;color:var(--soft)}
+input[type=number]{width:9ch;background:var(--code-bg);color:var(--text);
+  border:1px solid var(--line);border-radius:6px;padding:0.4rem 0.55rem;
+  font-size:1.05em;font-weight:700}
+input[type=number]:focus{outline:2px solid var(--mint-dim);border-color:var(--mint)}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:0.4rem 0.75rem;font-size:0.82em;cursor:pointer}
+button:hover{border-color:var(--mint-dim);color:var(--mint)}
+button.primary{background:var(--mint);border-color:var(--mint);color:#fff;font-weight:700}
+button.primary:hover{background:var(--mint-strong);border-color:var(--mint-strong);color:#fff}
+button.on{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
+button.on:hover{background:var(--orange-strong);border-color:var(--orange-strong);color:#fff}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:0 0.25rem}
+.hint{font-size:0.8em;color:var(--muted)}
+
+/* ── pipeline strip ──────────────────────────────────────────────── */
+.strip{display:flex;align-items:stretch;gap:0.3rem;flex-wrap:wrap;margin-bottom:1rem}
+.node{flex:1 1 8rem;background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--line);border-radius:8px;padding:0.55rem 0.7rem}
+.node .n{font-family:var(--mono);font-size:0.72em;color:var(--muted)}
+.node .name{font-weight:600;font-size:0.92em}
+.node .val{font-family:var(--mono);font-size:0.82em;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node[data-state=ok]{border-left-color:var(--mint);background:var(--mint-soft)}
+.node[data-state=ok] .val{color:var(--mint)}
+.node[data-state=wait]{border-left-color:var(--orange);background:var(--orange-soft)}
+.node[data-state=wait] .val{color:var(--orange)}
+.node[data-state=err]{border-left-color:var(--red);background:var(--red-soft)}
+.node[data-state=err] .val{color:var(--red)}
+.arrow{align-self:center;color:var(--muted);font-family:var(--mono)}
+
+/* ── verify step bar ─────────────────────────────────────────────── */
+.steps{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:0.7rem 0.85rem;margin-bottom:1rem}
+.steps .row{display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.6rem}
+.steps button.step.active{background:var(--mint-soft);border-color:var(--mint);color:var(--mint)}
+.expect{font-size:0.85em;color:var(--soft);margin-top:0.55rem}
+.expect b{color:var(--mint);font-weight:600}
+
+/* ── hop cards ───────────────────────────────────────────────────── */
+.hops{display:grid;grid-template-columns:repeat(auto-fit,minmax(26rem,1fr));gap:0.75rem}
+.hop{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.55rem}
+.hop.wide{grid-column:1/-1}
+.hop header{display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap}
+.hop header .num{font-family:var(--mono);font-size:1.2em;color:var(--muted)}
+.hop header .spacer{flex:1}
+.pill{font-family:var(--mono);font-size:0.72em;letter-spacing:0.06em;
+  text-transform:uppercase;padding:0.15rem 0.5rem;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill[data-state=ok]{color:var(--mint);border-color:var(--mint-dim);background:var(--mint-soft)}
+.pill[data-state=wait]{color:var(--orange);border-color:var(--orange-dim);background:var(--orange-soft)}
+.pill[data-state=err]{color:var(--red);border-color:var(--red);background:var(--red-soft)}
+.pill[data-state=run]{color:var(--soft)}
+.note{font-size:0.85em;color:var(--soft)}
+.note em{color:var(--mint);font-style:normal}
+.note em.hot{color:var(--orange)}
+
+/* ── command blocks ──────────────────────────────────────────────── */
+.cmd{position:relative;background:var(--code-bg);border:1px solid var(--line);
+  border-radius:8px}
+.cmd .cmd-label{font-family:var(--mono);font-size:0.68em;letter-spacing:0.1em;
+  text-transform:uppercase;color:var(--muted);padding:0.4rem 0.6rem 0}
+.cmd pre{font-size:0.82em;line-height:1.55;padding:0.35rem 0.6rem 0.55rem;
+  overflow-x:auto;white-space:pre;color:var(--text)}
+.cmd .copy{position:absolute;top:0.3rem;right:0.3rem;font-size:0.7em;padding:0.2rem 0.45rem;
+  background:var(--panel);opacity:0.7}
+.cmd:hover .copy{opacity:1}
+details.exact{font-size:0.8em;color:var(--muted)}
+details.exact summary{cursor:pointer;padding:0.15rem 0}
+details.exact pre{background:var(--code-bg);border:1px solid var(--line);border-radius:6px;
+  padding:0.45rem 0.6rem;margin-top:0.3rem;overflow-x:auto;white-space:pre-wrap;
+  word-break:break-all;font-size:0.95em;color:var(--soft)}
+
+/* ── result tables ───────────────────────────────────────────────── */
+.out{display:flex;flex-direction:column;gap:0.5rem}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:0.8em}
+th{text-align:left;padding:0.35rem 0.6rem;background:var(--panel2);color:var(--muted);
+  font-weight:400;white-space:nowrap;border-bottom:1px solid var(--line)}
+td{padding:0.3rem 0.6rem;white-space:nowrap;border-bottom:1px solid rgba(215,224,233,0.75)}
+tr:last-child td{border-bottom:none}
+tr.winner td{background:var(--mint-soft);color:var(--mint)}
+tr.tomb td{background:var(--orange-soft);color:var(--orange)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.empty{font-size:0.85em;color:var(--orange);font-family:var(--mono)}
+.failed{font-size:0.85em;color:var(--red);font-family:var(--mono);white-space:pre-wrap}
+.stat{font-family:var(--mono);font-size:0.82em;color:var(--muted)}
+.stat b{color:var(--text);font-weight:700}
+.json{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;
+  padding:0.5rem 0.6rem;font-family:var(--mono);font-size:0.8em;white-space:pre-wrap;
+  word-break:break-word;max-height:20rem;overflow:auto;color:var(--text)}
+footer{margin-top:1.2rem;font-size:0.8em;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <div class="kicker">Lesson 11 · end-to-end pipeline</div>
+    <h1>Trace one order across every boundary</h1>
+  </div>
+  <div class="hint">Every panel shows the exact command it ran. Nothing here knows anything the shell doesn't.</div>
+</header>
+
+<div class="controls">
+  <label class="field">order id
+    <input type="number" id="order-id" min="1" step="1" placeholder="9343">
+  </label>
+  <button class="primary" id="trace">Trace ⏎</button>
+  <button id="newest-canary">newest canary (1111)</button>
+  <button id="newest-order">newest order</button>
+  <div class="sep"></div>
+  <button id="watch">watch: off</button>
+  <span class="hint" id="watch-hint">re-traces every 2s — leave it on while <code>verify.py</code> runs</span>
+</div>
+
+<div class="strip" id="strip"></div>
+
+<div class="steps">
+  <div class="kicker">Which step of verify.py are you on?</div>
+  <div class="row" id="step-row"></div>
+  <div class="cmd" data-cmd="verify">
+    <div class="cmd-label">terminal 1</div>
+    <button class="copy">copy</button>
+    <pre></pre>
+  </div>
+  <div class="expect" id="expect"></div>
+</div>
+
+<div class="hops">
+
+  <section class="hop" id="hop-pg">
+    <header>
+      <span class="num">①</span><h2>Postgres — the source transaction</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">shell only</span>
+    </header>
+    <p class="note">Port 15432 speaks the Postgres wire protocol, not HTTP, so this page
+      genuinely cannot reach it — the one hop you must run in a terminal.
+      It is also the only hop where the row can be <em class="hot">gone</em> while every
+      downstream system still remembers it.</p>
+    <div class="cmd" data-cmd="pg">
+      <div class="cmd-label">terminal 3</div><button class="copy">copy</button><pre></pre>
+    </div>
+  </section>
+
+  <section class="hop" id="hop-connect">
+    <header>
+      <span class="num">②</span><h2>Debezium — the change becomes an event</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">idle</span>
+      <button class="run">Run</button>
+    </header>
+    <p class="note">Two independent objects, so the pill shows both — the same
+      <code>connector/task</code> pair <code>preflight.py</code> prints. The connector is the
+      configuration the worker owns; the <em>task</em> is the thread actually reading the WAL.
+      <em class="hot">A RUNNING connector whose task has FAILED publishes nothing</em> —
+      the exact shape of a green dashboard that is lying to you.</p>
+    <div class="cmd" data-cmd="connect">
+      <div class="cmd-label">terminal 3</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out"></div>
+  </section>
+
+  <section class="hop" id="hop-kafka">
+    <header>
+      <span class="num">③</span><h2>Kafka + Registry — the durable event</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">idle</span>
+      <button class="run">Run</button>
+    </header>
+    <p class="note">The topic has three partitions, so
+      <em class="hot">an offset is the identity of an event, not a version of a row</em>.
+      The partition/offset below come from the ClickHouse row — read it, then go
+      fetch that exact record off the log.</p>
+    <div class="cmd" data-cmd="registry">
+      <div class="cmd-label">terminal 3 · registered Avro versions</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="cmd" data-cmd="kafka">
+      <div class="cmd-label">terminal 3 · the one record, decoded through the registry</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out"></div>
+  </section>
+
+  <section class="hop" id="hop-spark">
+    <header>
+      <span class="num">④</span><h2>Spark — the processor</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">idle</span>
+    </header>
+    <p class="note">Spark leaves no per-row trace of its own; its evidence is the pair of
+      timestamps it wrote. <em>ingested_at − source_ts</em> is this order's own transit
+      time — the number the freshness panel aggregates, computed here from one row.</p>
+    <div class="cmd" data-cmd="spark">
+      <div class="cmd-label">terminal 3</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out"></div>
+  </section>
+
+  <section class="hop wide" id="hop-ch">
+    <header>
+      <span class="num">⑤</span><h2>ClickHouse — every version, then the winner</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">idle</span>
+      <button class="run">Run</button>
+    </header>
+    <p class="note">Same table, twice. Without <em>FINAL</em> you see every version that ever
+      arrived, including replays. With <em>FINAL</em> the highest <em>version</em> (the Debezium
+      LSN) wins. Neither query filters <em>_is_deleted</em> — the API does that, so a deleted
+      canary is visible here as an <em class="hot">orange tombstone row</em> that outranks its
+      own history. Fewer rows than you wrote is not loss: ReplacingMergeTree
+      <em>merges in the background</em>, so an order's older versions disappear on their own
+      once the winner is settled.</p>
+    <div class="cmd" data-cmd="ch-versions">
+      <div class="cmd-label">terminal 3 · every version</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out" id="out-ch-versions"></div>
+    <div class="cmd" data-cmd="ch-current">
+      <div class="cmd-label">terminal 3 · current state</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out" id="out-ch-current"></div>
+    <details class="exact">
+      <summary>the exact URLs this page fetched (same SQL, JSON format instead of a terminal one)</summary>
+      <pre id="ch-exact"></pre>
+    </details>
+  </section>
+
+  <section class="hop" id="hop-api">
+    <header>
+      <span class="num">⑥</span><h2>API — what a user can actually see</h2>
+      <span class="spacer"></span>
+      <span class="pill" data-state="idle">idle</span>
+      <button class="run">Run</button>
+    </header>
+    <p class="note">The read model adds one clause ClickHouse above does not:
+      <em>AND _is_deleted = 0</em>. That single predicate is the difference between the
+      tombstone row and a <em class="hot">404</em>.</p>
+    <div class="cmd" data-cmd="api">
+      <div class="cmd-label">terminal 3</div><button class="copy">copy</button><pre></pre>
+    </div>
+    <div class="out"></div>
+  </section>
+
+</div>
+
+<footer>
+  Host ports from <code>docker-compose.yml</code>: ClickHouse 18123 · API 18000 · Connect 18083 · Registry 18081.
+  Cards marked <em>shell only</em> are reachable, but the service sends no
+  <code>Access-Control-Allow-Origin</code> header, so a browser is not allowed to read the response.
+</footer>
+
+<script>
+// ── where everything lives (host ports, docker-compose.yml) ─────────────────
+const CH       = 'http://localhost:18123';
+const API      = 'http://localhost:18000';
+const CONNECT  = 'http://localhost:18083';
+const REGISTRY = 'http://localhost:18081';
+const CH_AUTH  = { user: 'lesson11', password: 'lesson11', database: 'lesson11' };
+const CONNECTOR = 'orders-cdc';
+const TOPIC     = 'cdc.public.orders';
+const CANARY_CUSTOMER = 1111;
+
+const $  = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+let orderId = null;
+let watchTimer = null;
+let hasDiscount = true;      // re-probed each trace; mirrors app/main.py
+let lastRow = null;          // current ClickHouse state, for the Kafka/Spark cards
+
+// ── verify.py steps: the command to run, and what each hop should show ──────
+const STEPS = [
+  { id: 'full', label: 'full run', flags: () => '--verbose',
+    expect: 'All five steps back to back. The canary is <b>deleted at the end</b>, so trace the id it printed <i>while</i> it runs — or run the steps one at a time below.' },
+  { id: 'insert', label: '1 · insert', flags: () => '--insert --verbose',
+    expect: 'ClickHouse: <b>one version</b>, _is_deleted=0. API: <b>200</b>, amount 11.11, status pending. Copy the id it prints into the box above.' },
+  { id: 'update', label: '2 · update', flags: id => `--update --order-id ${id} --verbose`,
+    expect: 'ClickHouse: <b>two versions</b> — the old row is still there. FINAL picks the <b>higher LSN</b>: amount 42.42, status paid.' },
+  { id: 'nullable-set', label: '3a · discount set', flags: id => `--nullable-set --order-id ${id} --verbose`,
+    expect: 'discount_code = <b>VERIFY11</b> in ClickHouse and in the API. Before the migration this step does not exist yet.' },
+  { id: 'nullable-clear', label: '3b · discount NULL', flags: id => `--nullable-clear --order-id ${id} --verbose`,
+    expect: 'discount_code back to <b>NULL</b> — an explicit null, <b>not</b> VERIFY11 resurrected from the before-image.' },
+  { id: 'delete', label: '4 · delete', flags: id => `--delete --order-id ${id} --verbose`,
+    expect: 'Postgres: row gone. ClickHouse/API: <b>still there for a moment</b> — you are watching the delete event travel.' },
+  { id: 'verify-delete', label: '5 · verify delete', flags: id => `--verify-delete --order-id ${id} --verbose`,
+    expect: 'ClickHouse: a <b>new highest-version row with _is_deleted=1</b> outranks the history. API: <b>404</b>.' },
+];
+let step = STEPS[0];
+
+// ── ClickHouse over HTTP ───────────────────────────────────────────────────
+// The browser asks for JSON and for the CORS header; the curl we print asks for
+// a terminal-friendly format. The SQL is byte-for-byte the same either way.
+function chFetchURL(sql) {
+  const p = new URLSearchParams({
+    ...CH_AUTH,
+    default_format: 'JSON',
+    output_format_json_quote_64bit_integers: '0',
+    add_http_cors_header: '1',
+    query: sql,
+  });
+  return `${CH}/?${p}`;
+}
+function chCurl(sql) {
+  const p = new URLSearchParams({ ...CH_AUTH, default_format: 'PrettyCompact' });
+  return `curl -s '${CH}/?${p}' \\\n  --data-binary "${sql.trim()}"`;
+}
+async function chQuery(sql) {
+  const started = performance.now();
+  const res = await fetch(chFetchURL(sql));
+  const text = await res.text();
+  if (!res.ok) throw new Error(text.trim() || `HTTP ${res.status}`);
+  const body = JSON.parse(text);
+  return { meta: body.meta, data: body.data, ms: Math.round(performance.now() - started) };
+}
+
+// ── the two queries this whole page is about ───────────────────────────────
+const discountCol = () => (hasDiscount ? 'discount_code, ' : '');
+
+const versionsSQL = id => `SELECT version, _is_deleted, status, amount, ${discountCol()}
+       kafka_partition, kafka_offset, source_ts, ingested_at
+FROM orders_current
+WHERE order_id = ${id}
+ORDER BY version`;
+
+const currentSQL = id => `SELECT order_id, customer_id, amount, status, ${discountCol()}
+       version, _is_deleted, source_topic, kafka_partition, kafka_offset,
+       source_ts, ingested_at
+FROM orders_current FINAL
+WHERE order_id = ${id}`;
+
+// ── the commands every card prints ─────────────────────────────────────────
+function commands() {
+  const id = orderId ?? '<id>';
+  const part = lastRow ? lastRow.kafka_partition : '<partition>';
+  const off  = lastRow ? lastRow.kafka_offset    : '<offset>';
+  return {
+    'verify': `uv run python scripts/verify.py ${step.flags(id)}`,
+    'pg': `docker compose exec postgres psql -U lesson11 -d orders \\\n`
+        + `  -c "SELECT * FROM orders WHERE id = ${id}" \\\n`
+        + `  -c "SELECT pg_current_wal_lsn()"`,
+    'connect': `curl -s ${CONNECT}/connectors/${CONNECTOR}/status | jq`,
+    'registry': `curl -s ${REGISTRY}/subjects/${TOPIC}-value/versions`,
+    'kafka': `docker compose exec schema-registry kafka-avro-console-consumer \\\n`
+           + `  --bootstrap-server kafka:9092 \\\n`
+           + `  --property schema.registry.url=http://schema-registry:8081 \\\n`
+           + `  --topic ${TOPIC} --partition ${part} --offset ${off} --max-messages 1`,
+    'ch-versions': chCurl(versionsSQL(id)),
+    'ch-current': chCurl(currentSQL(id)),
+    'spark': `docker compose logs --tail 20 stream-processor\n`
+           + `curl -s localhost:19108/metrics | grep -E '^pipeline_(kafka_lag|end_to_end|schema_ids)'`,
+    'api': `curl -s ${API}/api/orders/${id} | jq`,
+  };
+}
+
+function renderCommands() {
+  const cmds = commands();
+  for (const [key, text] of Object.entries(cmds)) {
+    const block = $(`.cmd[data-cmd="${key}"] pre`);
+    if (block) block.textContent = text;
+  }
+  const id = orderId ?? '<id>';
+  $('#ch-exact').textContent = `${chFetchURL(versionsSQL(id))}\n\n${chFetchURL(currentSQL(id))}`;
+}
+
+// ── small rendering helpers ────────────────────────────────────────────────
+function setPill(hopId, state, text) {
+  const pill = $(`#${hopId} .pill`);
+  pill.dataset.state = state;
+  pill.textContent = text;
+}
+function setNode(key, state, value) {
+  const node = $(`#strip .node[data-node="${key}"]`);
+  node.dataset.state = state;
+  $('.val', node).textContent = value;
+}
+function clear(el) { el.innerHTML = ''; }
+function fail(el, message) {
+  el.innerHTML = `<div class="failed"></div>`;
+  $('.failed', el).textContent = message;
+}
+function isNumericCol(type) { return /Int|Float|Decimal/.test(type || ''); }
+function esc(value) {
+  return String(value).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function renderRows(el, { meta, data, ms }, { winner } = {}) {
+  clear(el);
+  if (!data.length) {
+    el.innerHTML = `<div class="empty">0 rows — nothing with this order_id has reached ClickHouse yet.</div>`;
+    return;
+  }
+  const cols = meta.map(m => m.name);
+  const top = winner ? Math.max(...data.map(r => Number(r.version))) : null;
+  const table = document.createElement('table');
+  table.innerHTML =
+    `<thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>` +
+    `<tbody>${data.map(row => {
+      const isTomb = Number(row._is_deleted) === 1;
+      const isTop  = winner && Number(row.version) === top;
+      const cls = isTomb && isTop ? 'tomb' : (isTop ? 'winner' : '');
+      return `<tr class="${cls}">${meta.map(m => {
+        const v = row[m.name];
+        const cell = v === null ? 'ᴺᵁᴸᴸ' : esc(v);
+        return `<td class="${isNumericCol(m.type) ? 'num' : ''}">${cell}</td>`;
+      }).join('')}</tr>`;
+    }).join('')}</tbody>`;
+  const wrap = document.createElement('div');
+  wrap.className = 'tbl-wrap';
+  wrap.appendChild(table);
+  el.appendChild(wrap);
+  const stat = document.createElement('div');
+  stat.className = 'stat';
+  stat.innerHTML = `<b>${data.length}</b> row${data.length === 1 ? '' : 's'} · ${ms} ms`;
+  el.appendChild(stat);
+}
+
+function renderJSON(el, value) {
+  clear(el);
+  const pre = document.createElement('div');
+  pre.className = 'json';
+  pre.textContent = JSON.stringify(value, null, 2);
+  el.appendChild(pre);
+}
+
+// A CORS-blocked fetch and a dead port both reject with the same TypeError.
+// An opaque no-cors request still resolves when the service is actually up, so
+// this tells "the browser is not allowed to read it" apart from "it is down".
+async function reachable(url) {
+  try { await fetch(url, { mode: 'no-cors' }); return true; }
+  catch { return false; }
+}
+
+function parseCHTime(value) {
+  // ClickHouse JSON: "2026-08-01 14:02:33.660", always UTC in this schema.
+  return value ? new Date(value.replace(' ', 'T') + 'Z') : null;
+}
+
+// ── the hops ───────────────────────────────────────────────────────────────
+async function runConnect() {
+  const out = $('#hop-connect .out');
+  setPill('hop-connect', 'run', 'running');
+  const url = `${CONNECT}/connectors/${CONNECTOR}/status`;
+  try {
+    const body = await (await fetch(url)).json();
+    // connector.state and tasks[0].state fail independently. "no task" is a
+    // real state: a connector can be registered with nothing running under it.
+    const conn = body.connector?.state ?? 'unknown';
+    const task = body.tasks?.[0]?.state ?? 'no task';
+    const ok = conn === 'RUNNING' && task === 'RUNNING';
+    // The pill repeats preflight.py's exact string; the strip has no legend
+    // beside it, so it names the two things instead.
+    setPill('hop-connect', ok ? 'ok' : 'err', `${conn} / ${task}`);
+    setNode('debezium', ok ? 'ok' : 'err',
+      conn === task ? `connector+task ${conn}` : `connector ${conn} · task ${task}`);
+    renderJSON(out, body);
+  } catch {
+    const up = await reachable(url);
+    setPill('hop-connect', up ? 'idle' : 'err', up ? 'shell only' : 'unreachable');
+    setNode('debezium', up ? 'idle' : 'err', up ? 'run the curl' : 'unreachable');
+    fail(out, up
+      ? 'Connect answered, but sends no Access-Control-Allow-Origin header, so the\nbrowser refuses to hand the body to this page. Run the curl above.\n(Enable it: CONNECT_ACCESS_CONTROL_ALLOW_ORIGIN: "*" in docker-compose.yml.)'
+      : `Nothing is listening on ${CONNECT}. Is the stack up?`);
+  }
+}
+
+async function runKafka() {
+  const out = $('#hop-kafka .out');
+  setPill('hop-kafka', 'run', 'running');
+  const url = `${REGISTRY}/subjects/${TOPIC}-value/versions`;
+  const identity = lastRow
+    ? `${TOPIC}:${lastRow.kafka_partition}:${lastRow.kafka_offset}`
+    : 'no row yet';
+  try {
+    const versions = await (await fetch(url)).json();
+    setPill('hop-kafka', 'ok', `avro v${versions.join(', v')}`);
+    clear(out);
+    const stat = document.createElement('div');
+    stat.className = 'stat';
+    stat.innerHTML = `registered writer schemas: <b>[${versions.join(', ')}]</b>`
+      + ` · this order's event: <b>${identity}</b>`;
+    out.appendChild(stat);
+  } catch {
+    const up = await reachable(url);
+    setPill('hop-kafka', up ? 'idle' : 'err', up ? 'shell only' : 'unreachable');
+    fail(out, up
+      ? 'The registry answered, but sends no Access-Control-Allow-Origin header.\nRun the curl above.\n(Enable it: SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN: "*" in docker-compose.yml.)'
+      : `Nothing is listening on ${REGISTRY}. Is the stack up?`);
+  }
+  setNode('kafka', lastRow ? 'ok' : 'wait', identity);
+}
+
+function runSpark() {
+  const out = $('#hop-spark .out');
+  clear(out);
+  if (!lastRow) {
+    setPill('hop-spark', 'wait', 'no row yet');
+    setNode('spark', 'wait', 'nothing written');
+    out.innerHTML = `<div class="empty">Nothing for this id has been written yet — either it is still in flight, or it never existed.</div>`;
+    return;
+  }
+  const src = parseCHTime(lastRow.source_ts);
+  const ing = parseCHTime(lastRow.ingested_at);
+  const transit = (ing - src) / 1000;
+  setPill('hop-spark', 'ok', `${transit.toFixed(3)}s transit`);
+  setNode('spark', 'ok', `+${transit.toFixed(2)}s`);
+  const stat = document.createElement('div');
+  stat.className = 'stat';
+  stat.innerHTML = `source_ts <b>${lastRow.source_ts}</b> → ingested_at <b>${lastRow.ingested_at}</b>`
+    + ` = <b>${transit.toFixed(3)}s</b> from committed in Postgres to answerable in ClickHouse`;
+  out.appendChild(stat);
+}
+
+async function probeDiscountColumn() {
+  try {
+    const { data } = await chQuery(
+      `SELECT count() AS n FROM system.columns WHERE database = currentDatabase()`
+      + ` AND table = 'orders_current' AND name = 'discount_code'`);
+    hasDiscount = Number(data[0].n) > 0;
+  } catch { /* leave the last known answer in place */ }
+}
+
+async function runClickHouse() {
+  const versionsOut = $('#out-ch-versions');
+  const currentOut  = $('#out-ch-current');
+  setPill('hop-ch', 'run', 'running');
+  // The column list adapts to the mid-class ADD COLUMN, exactly like app/main.py.
+  await probeDiscountColumn();
+  renderCommands();
+  try {
+    const [versions, current] = await Promise.all([
+      chQuery(versionsSQL(orderId)),
+      chQuery(currentSQL(orderId)),
+    ]);
+    renderRows(versionsOut, versions, { winner: true });
+    renderRows(currentOut, current, { winner: true });
+    lastRow = current.data[0] ?? null;
+    if (!versions.data.length) {
+      setPill('hop-ch', 'wait', 'not here yet');
+      setNode('clickhouse', 'wait', '0 versions');
+    } else {
+      const deleted = lastRow && Number(lastRow._is_deleted) === 1;
+      const n = versions.data.length;
+      const count = `${n} version${n === 1 ? '' : 's'}`;
+      setPill('hop-ch', 'ok', deleted ? `${count} · tombstone wins` : count);
+      setNode('clickhouse', 'ok', deleted ? `${count} → deleted` : count);
+    }
+  } catch (err) {
+    lastRow = null;
+    setPill('hop-ch', 'err', 'failed');
+    setNode('clickhouse', 'err', 'query failed');
+    fail(versionsOut, String(err.message || err)
+      + `\n\nIf this says "Failed to fetch", ClickHouse is either down or not reachable on ${CH}.`);
+    clear(currentOut);
+  }
+  renderCommands();
+}
+
+async function runAPI() {
+  const out = $('#hop-api .out');
+  setPill('hop-api', 'run', 'running');
+  try {
+    const res = await fetch(`${API}/api/orders/${orderId}`);
+    const body = await res.json();
+    if (res.status === 404) {
+      // A 404 means two different things, and the difference is only knowable
+      // from hop ⑤. Against a winning tombstone it is the correct end state;
+      // against no row at all it means "still in flight".
+      const gone = lastRow && Number(lastRow._is_deleted) === 1;
+      setPill('hop-api', gone ? 'ok' : 'wait', gone ? '404 · deleted' : '404 not found');
+      setNode('api', gone ? 'ok' : 'wait', gone ? '404 · deleted' : '404');
+      clear(out);
+      out.innerHTML = gone
+        ? `<div class="stat">404 — and that is the <b>right</b> answer. ClickHouse's winning row has`
+          + ` <b>_is_deleted = 1</b>, so the API's <b>AND _is_deleted = 0</b> hides it. The two hops agree.</div>`
+        : `<div class="empty">404 — and ClickHouse has no row either, so this order is still somewhere between Postgres and the sink.</div>`;
+      return;
+    }
+    setPill('hop-api', 'ok', `200 · ${body.status}`);
+    setNode('api', 'ok', `200 · ${body.status}`);
+    renderJSON(out, body);
+  } catch (err) {
+    setPill('hop-api', 'err', 'unreachable');
+    setNode('api', 'err', 'unreachable');
+    fail(out, `${err.message || err}\n\nIs the API up on ${API}?`);
+  }
+}
+
+// ── orchestration ──────────────────────────────────────────────────────────
+async function trace() {
+  if (!orderId) { $('#order-id').focus(); return; }
+  setNode('postgres', 'idle', 'shell only');
+  await runClickHouse();      // first: it produces the partition/offset the others quote
+  renderCommands();
+  runSpark();
+  await Promise.all([runConnect(), runKafka(), runAPI()]);
+  renderCommands();
+}
+
+async function fillNewest(customerId) {
+  const url = customerId
+    ? `${API}/api/orders?limit=1&customer_id=${customerId}`
+    : `${API}/api/orders?limit=1`;
+  try {
+    const body = await (await fetch(url)).json();
+    if (!body.rows.length) { alert('No matching order in the read model yet.'); return; }
+    $('#order-id').value = body.rows[0].order_id;
+    orderId = body.rows[0].order_id;
+    renderCommands();
+    trace();
+  } catch (err) {
+    alert(`Could not reach the API on ${API}: ${err.message || err}`);
+  }
+}
+
+function toggleWatch() {
+  const button = $('#watch');
+  if (watchTimer) {
+    clearInterval(watchTimer);
+    watchTimer = null;
+    button.classList.remove('on');
+    button.textContent = 'watch: off';
+    return;
+  }
+  watchTimer = setInterval(() => { if (orderId) trace(); }, 2000);
+  button.classList.add('on');
+  button.textContent = 'watch: on';
+  trace();
+}
+
+// ── build the static bits, wire the events ─────────────────────────────────
+const NODES = [
+  ['postgres',   '①', 'Postgres',   'shell only'],
+  ['debezium',   '②', 'Debezium',   'idle'],
+  ['kafka',      '③', 'Kafka',      'idle'],
+  ['spark',      '④', 'Spark',      'idle'],
+  ['clickhouse', '⑤', 'ClickHouse', 'idle'],
+  ['api',        '⑥', 'API',        'idle'],
+];
+$('#strip').innerHTML = NODES.map(([key, n, name, val], i) =>
+  `${i ? '<span class="arrow">▸</span>' : ''}` +
+  `<div class="node" data-node="${key}" data-state="idle">` +
+  `<div class="n">${n}</div><div class="name">${name}</div><div class="val">${val}</div></div>`
+).join('');
+
+$('#step-row').innerHTML = STEPS.map(s =>
+  `<button class="step${s.id === step.id ? ' active' : ''}" data-step="${s.id}">${s.label}</button>`
+).join('');
+$$('#step-row .step').forEach(button => button.addEventListener('click', () => {
+  step = STEPS.find(s => s.id === button.dataset.step);
+  $$('#step-row .step').forEach(b => b.classList.toggle('active', b === button));
+  $('#expect').innerHTML = step.expect;
+  renderCommands();
+}));
+
+$$('.cmd .copy').forEach(button => button.addEventListener('click', async () => {
+  const text = $('pre', button.closest('.cmd')).textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // file:// in some browsers has no clipboard permission; fall back.
+    const scratch = document.createElement('textarea');
+    scratch.value = text;
+    document.body.appendChild(scratch);
+    scratch.select();
+    document.execCommand('copy');
+    scratch.remove();
+  }
+  const original = button.textContent;
+  button.textContent = 'copied';
+  setTimeout(() => { button.textContent = original; }, 900);
+}));
+
+// Hops ⑤ and ⑥ are about one order; ② and ③ describe the pipeline itself and
+// answer with or without an id.
+const needsId = run => () => { if (orderId) run(); else $('#order-id').focus(); };
+$('#hop-connect .run').addEventListener('click', runConnect);
+$('#hop-kafka .run').addEventListener('click', runKafka);
+$('#hop-ch .run').addEventListener('click', needsId(() => runClickHouse().then(runSpark)));
+$('#hop-api .run').addEventListener('click', needsId(runAPI));
+$('#trace').addEventListener('click', trace);
+$('#watch').addEventListener('click', toggleWatch);
+$('#newest-canary').addEventListener('click', () => fillNewest(CANARY_CUSTOMER));
+$('#newest-order').addEventListener('click', () => fillNewest(null));
+$('#order-id').addEventListener('input', event => {
+  orderId = event.target.value ? Number(event.target.value) : null;
+  lastRow = null;
+  renderCommands();
+});
+$('#order-id').addEventListener('keydown', event => { if (event.key === 'Enter') trace(); });
+
+$('#expect').innerHTML = step.expect;
+renderCommands();
+$('#order-id').focus();
+</script>
+</body>
+</html>

@@ -96,6 +96,57 @@ whole chain from one response body instead of trusting a dashboard:
 `ingested_at − source_ts` is this order's own transit time — 4.304s in that
 sample. That is the number the freshness panel aggregates.
 
+## Trace one order in the browser
+
+[`dashboard.html`](dashboard.html) is the same inspection points, clickable. Open
+it directly — it is one static file with no build step and no server of its own:
+
+```bash
+open dashboard.html          # or: python3 -m http.server 8111
+```
+
+Type an order id (or press **newest canary (1111)** to grab the one `verify.py`
+just created) and hit **Trace**. Each hop card runs its query and prints the exact
+shell command that would produce the same answer, so nothing on the page is a
+number you have to take on faith:
+
+| Hop | What the page does | Command it shows |
+|---|---|---|
+| ① Postgres | nothing — 15432 is not HTTP | `psql … WHERE id = N` + `pg_current_wal_lsn()` |
+| ② Debezium | reads connector **and** task state | `curl …/connectors/orders-cdc/status` |
+| ③ Kafka + Registry | reads registered Avro versions | `kafka-avro-console-consumer --partition P --offset O` |
+| ④ Spark | computes `ingested_at − source_ts` for this row | `docker compose logs stream-processor` |
+| ⑤ ClickHouse | runs both queries: raw versions, then `FINAL` | `curl …:18123 --data-binary "SELECT …"` |
+| ⑥ API | fetches the order, 200 or 404 | `curl …/api/orders/N` |
+
+The partition and offset in hop ③ are filled in from the ClickHouse row, so you
+can read an event's identity off the screen and then go pull that exact record
+off the log.
+
+**Watch** re-traces every two seconds. Turn it on, run a single verify step in a
+terminal, and the row appears hop by hop while the class watches:
+
+```bash
+uv run python scripts/verify.py --insert --verbose      # paste the id it prints
+uv run python scripts/verify.py --update --order-id N --verbose
+uv run python scripts/verify.py --delete --order-id N --verbose
+uv run python scripts/verify.py --verify-delete --order-id N --verbose
+```
+
+The step buttons above the cards print the matching `verify.py` invocation and
+state what each hop should show, so a wrong screen is diagnosable rather than
+merely disappointing. After a delete, hop ⑤ shows three versions with an orange
+tombstone winning under `FINAL`, and hop ⑥ shows `404` — the two views disagree
+on purpose, and the difference is one `_is_deleted = 0` predicate.
+
+Hops ② and ③ need `ACCESS_CONTROL_ALLOW_ORIGIN` on Connect and Schema Registry,
+which `docker-compose.yml` sets for this lesson only. On a stack started before
+that setting existed, they degrade to "shell only" until you run:
+
+```bash
+docker compose up -d schema-registry connect
+```
+
 ## Run the schema-evolution centerpiece
 
 Keep ordinary load flowing in another terminal, then run:
@@ -130,6 +181,7 @@ curl -s http://localhost:18081/subjects/cdc.public.orders-value/versions
 
 | Surface | URL | Credentials |
 |---|---|---|
+| Order tracer | `dashboard.html` (open the file) | none |
 | Orders API | http://localhost:18000/docs | none |
 | Spark UI | http://localhost:14040 | none |
 | Processor metrics | http://localhost:19108/metrics | none |

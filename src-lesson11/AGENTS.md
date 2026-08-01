@@ -207,6 +207,15 @@ Lesson 11's job is recognition, not novelty. These choices are deliberate:
 - `scripts/migrate_discount_code.py` — downstream-first mixed-schema proof.
 - `prometheus/`, `grafana/` — scrape config, alerts, provisioned datasource and
   dashboard.
+- `dashboard.html` — single-file, no-build order tracer for class. One order id,
+  six hop cards; each runs its own query *and* prints the equivalent shell
+  command, so the page never becomes a number students must trust. It queries
+  ClickHouse (`:18123`) and the API (`:18000`) directly from the browser rather
+  than through a new backend endpoint — the point is that the layers are
+  separately reachable. Connect and Schema Registry therefore carry
+  `ACCESS_CONTROL_ALLOW_ORIGIN: "*"` in `docker-compose.yml` (lesson-only; both
+  are admin surfaces in production). Postgres has no HTTP interface at all, so
+  hop ① is honestly marked "shell only" instead of being proxied.
 - `README.md` — operator/student runbook.
 - `LESSON_PLAN.md` — three-hour run of show and slide-agent handoff.
 
